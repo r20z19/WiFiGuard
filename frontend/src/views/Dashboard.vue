@@ -155,16 +155,29 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 
 const alertStore = useAlertStore()
 
+onMounted(() => {
+  alertStore.fetchSystemStatus()
+  alertStore.fetchCurrentAlerts()
+  alertStore.fetchOnlineDevices()
+  alertStore.fetchWhitelist()
+  alertStore.fetchBlacklist()
+  alertStore.fetchEmailConfig()
+})
+
 const systemStatus = computed(() => {
-  return {
-    text: '监听中',
-    class: 'success'
+  const s = alertStore.systemStatus
+  if (s.status === 'listening') {
+    return { text: '监听中', class: 'success' }
   }
+  if (s.status === 'initializing') {
+    return { text: '初始化中', class: 'warning' }
+  }
+  return { text: s.status, class: 'info' }
 })
 
 const currentSuggestion = computed(() => {

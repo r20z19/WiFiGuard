@@ -1,3 +1,12 @@
 node_modules
 package-lock.json
 .marscode/
+CLAUDE.md
+
+# Backend
+backend/data/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.log

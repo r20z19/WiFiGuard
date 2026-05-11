@@ -63,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -72,6 +72,10 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingMac = ref('')
 const form = ref({ mac: '', name: '', reason: '' })
+
+onMounted(() => {
+  alertStore.fetchBlacklist()
+})
 
 const showAddDialog = () => {
   isEdit.value = false
@@ -86,30 +90,29 @@ const editDevice = (device) => {
   dialogVisible.value = true
 }
 
-const saveDevice = () => {
+const saveDevice = async () => {
   if (!form.value.mac || !form.value.name || !form.value.reason) {
     ElMessage.warning('请填写完整信息')
     return
   }
 
-  if (isEdit.value) {
-    const index = alertStore.blacklist.findIndex(d => d.mac === editingMac.value)
-    if (index !== -1) {
-      alertStore.blacklist[index].name = form.value.name
-      alertStore.blacklist[index].reason = form.value.reason
+  try {
+    if (isEdit.value) {
+      await alertStore.removeFromBlacklist(editingMac.value)
+      await alertStore.addToBlacklist({ mac: form.value.mac, name: form.value.name, reason: form.value.reason })
+      ElMessage.success('设备信息已更新')
+    } else {
+      await alertStore.addToBlacklist({
+        mac: form.value.mac,
+        name: form.value.name,
+        reason: form.value.reason
+      })
+      ElMessage.warning('设备已加入黑名单')
     }
-    ElMessage.success('设备信息已更新')
-  } else {
-    alertStore.addToBlacklist({
-      mac: form.value.mac,
-      name: form.value.name,
-      reason: form.value.reason,
-      addedAt: new Date().toLocaleString('zh-CN')
-    })
-    ElMessage.warning('设备已加入黑名单')
+    dialogVisible.value = false
+  } catch {
+    ElMessage.error('操作失败')
   }
-
-  dialogVisible.value = false
 }
 
 const removeDevice = (mac) => {
@@ -117,8 +120,10 @@ const removeDevice = (mac) => {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    alertStore.removeFromBlacklist(mac)
+  }).then(async () => {
+    try {
+      await alertStore.removeFromBlacklist(mac)
+    } catch { /* store already refreshed */ }
     ElMessage.success('设备已从黑名单移除')
   }).catch(() => {})
 }

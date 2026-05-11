@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAlertStore } from './store/alert'
 
@@ -79,6 +79,21 @@ const alertStore = useAlertStore()
 
 const activeMenu = computed(() => route.path)
 const alertCount = computed(() => alertStore.currentAlerts.length)
+
+let pollTimer = null
+
+onMounted(() => {
+  alertStore.fetchSystemStatus()
+  alertStore.fetchCurrentAlerts()
+  alertStore.fetchOnlineDevices()
+  pollTimer = setInterval(() => {
+    alertStore.fetchCurrentAlerts()
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+})
 
 const handleMenuSelect = (index) => {
   router.push(index)

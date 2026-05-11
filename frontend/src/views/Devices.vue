@@ -101,12 +101,18 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage } from 'element-plus'
 
 const alertStore = useAlertStore()
 const searchQuery = ref('')
+
+onMounted(() => {
+  alertStore.fetchOnlineDevices()
+  alertStore.fetchWhitelist()
+  alertStore.fetchBlacklist()
+})
 
 const filteredDevices = computed(() => {
   if (!searchQuery.value) return alertStore.onlineDevices
@@ -142,26 +148,33 @@ const isInBlacklist = (mac) => {
   return alertStore.blacklist.some(d => d.mac === mac)
 }
 
-const addToWhitelist = (device) => {
-  alertStore.addToWhitelist({
-    mac: device.mac,
-    name: `设备-${device.mac.slice(-4)}`,
-    addedAt: new Date().toLocaleString('zh-CN')
-  })
-  ElMessage.success(`设备 ${device.mac} 已加入白名单`)
+const addToWhitelist = async (device) => {
+  try {
+    await alertStore.addToWhitelist({
+      mac: device.mac,
+      name: `设备-${device.mac.slice(-4)}`
+    })
+    ElMessage.success(`设备 ${device.mac} 已加入白名单`)
+  } catch {
+    ElMessage.error('加入白名单失败')
+  }
 }
 
-const addToBlacklist = (device) => {
-  alertStore.addToBlacklist({
-    mac: device.mac,
-    name: `设备-${device.mac.slice(-4)}`,
-    reason: '手动添加',
-    addedAt: new Date().toLocaleString('zh-CN')
-  })
-  ElMessage.warning(`设备 ${device.mac} 已加入黑名单`)
+const addToBlacklist = async (device) => {
+  try {
+    await alertStore.addToBlacklist({
+      mac: device.mac,
+      name: `设备-${device.mac.slice(-4)}`,
+      reason: '手动添加'
+    })
+    ElMessage.warning(`设备 ${device.mac} 已加入黑名单`)
+  } catch {
+    ElMessage.error('加入黑名单失败')
+  }
 }
 
 const refreshDevices = () => {
+  alertStore.fetchOnlineDevices()
   ElMessage.success('设备列表已刷新')
 }
 </script>

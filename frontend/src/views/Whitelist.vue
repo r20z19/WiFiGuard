@@ -59,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -68,6 +68,10 @@ const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editingMac = ref('')
 const form = ref({ mac: '', name: '' })
+
+onMounted(() => {
+  alertStore.fetchWhitelist()
+})
 
 const showAddDialog = () => {
   isEdit.value = false
@@ -82,28 +86,28 @@ const editDevice = (device) => {
   dialogVisible.value = true
 }
 
-const saveDevice = () => {
+const saveDevice = async () => {
   if (!form.value.mac || !form.value.name) {
     ElMessage.warning('请填写完整信息')
     return
   }
 
-  if (isEdit.value) {
-    const index = alertStore.whitelist.findIndex(d => d.mac === editingMac.value)
-    if (index !== -1) {
-      alertStore.whitelist[index].name = form.value.name
+  try {
+    if (isEdit.value) {
+      await alertStore.removeFromWhitelist(editingMac.value)
+      await alertStore.addToWhitelist({ mac: form.value.mac, name: form.value.name })
+      ElMessage.success('设备信息已更新')
+    } else {
+      await alertStore.addToWhitelist({
+        mac: form.value.mac,
+        name: form.value.name
+      })
+      ElMessage.success('设备已加入白名单')
     }
-    ElMessage.success('设备信息已更新')
-  } else {
-    alertStore.addToWhitelist({
-      mac: form.value.mac,
-      name: form.value.name,
-      addedAt: new Date().toLocaleString('zh-CN')
-    })
-    ElMessage.success('设备已加入白名单')
+    dialogVisible.value = false
+  } catch {
+    ElMessage.error('操作失败')
   }
-
-  dialogVisible.value = false
 }
 
 const removeDevice = (mac) => {
@@ -111,8 +115,10 @@ const removeDevice = (mac) => {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    alertStore.removeFromWhitelist(mac)
+  }).then(async () => {
+    try {
+      await alertStore.removeFromWhitelist(mac)
+    } catch { /* store already refreshed */ }
     ElMessage.success('设备已从白名单移除')
   }).catch(() => {})
 }

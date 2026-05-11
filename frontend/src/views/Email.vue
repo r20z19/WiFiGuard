@@ -132,32 +132,25 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage } from 'element-plus'
 
 const alertStore = useAlertStore()
 
-const pushRecords = ref([
-  {
-    time: '2026-05-11 14:32:16',
-    alertType: 'Deauth攻击',
-    recipient: 'admin@company.com',
-    status: '成功'
-  },
-  {
-    time: '2026-05-11 14:28:43',
-    alertType: '钓鱼AP',
-    recipient: 'admin@company.com',
-    status: '成功'
-  },
-  {
-    time: '2026-05-10 09:15:31',
-    alertType: '暴力破解',
-    recipient: 'admin@company.com',
-    status: '失败'
-  }
-])
+const pushRecords = ref([])
+
+onMounted(() => {
+  alertStore.fetchEmailConfig()
+  refreshRecords()
+})
+
+async function refreshRecords() {
+  try {
+    await alertStore.fetchEmailRecords()
+    pushRecords.value = alertStore.emailRecords
+  } catch { /* ignore */ }
+}
 
 const handleToggle = (enabled) => {
   if (enabled) {
@@ -167,21 +160,32 @@ const handleToggle = (enabled) => {
   }
 }
 
-const saveConfig = () => {
-  alertStore.updateEmailConfig(alertStore.emailConfig)
-  ElMessage.success('邮箱配置已保存')
+const saveConfig = async () => {
+  try {
+    await alertStore.updateEmailConfig(alertStore.emailConfig)
+    ElMessage.success('邮箱配置已保存')
+  } catch {
+    ElMessage.error('保存失败')
+  }
 }
 
-const testConnection = () => {
+const testConnection = async () => {
   if (!alertStore.emailConfig.email || !alertStore.emailConfig.authorizationCode) {
     ElMessage.warning('请先填写邮箱和授权码')
     return
   }
 
   ElMessage.info('正在测试连接...')
-  setTimeout(() => {
-    ElMessage.success('连接测试成功')
-  }, 1500)
+  try {
+    const result = await alertStore.testEmail(alertStore.emailConfig)
+    if (result.success) {
+      ElMessage.success(result.message)
+    } else {
+      ElMessage.error(result.message)
+    }
+  } catch {
+    ElMessage.error('连接测试失败')
+  }
 }
 </script>
 

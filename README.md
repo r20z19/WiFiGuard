@@ -1,149 +1,146 @@
-# WiFiGuard 前端系统
+# WiFiGuard
 
-智能无线入侵检测与预警系统 - Web可视化管理与告警平台
+智能无线入侵检测与预警系统 — Web 可视化管理与告警平台
 
-## 技术栈
-
-- Vue 3 - 渐进式JavaScript框架
-- Vite - 下一代前端构建工具
-- Element Plus - Vue 3 UI组件库
-- Pinia - Vue状态管理
-- Vue Router - Vue路由管理
-- Axios - HTTP客户端
-
-## 项目结构
+## 项目架构
 
 ```
-frontend/
-├── src/
-│   ├── api/              # API接口
-│   │   └── index.js
-│   ├── assets/           # 静态资源
-│   │   └── global.css
-│   ├── components/       # 组件
-│   ├── router/           # 路由配置
-│   │   └── index.js
-│   ├── store/            # 状态管理
-│   │   └── alert.js
-│   ├── views/            # 页面
-│   │   ├── Dashboard.vue    # 系统概览
-│   │   ├── Alerts.vue       # 当前告警
-│   │   ├── History.vue      # 历史告警
-│   │   ├── Devices.vue      # 在线设备
-│   │   ├── Whitelist.vue    # 设备白名单
-│   │   ├── Blacklist.vue    # 设备黑名单
-│   │   └── Email.vue        # 邮箱推送
-│   ├── App.vue           # 根组件
-│   └── main.js           # 入口文件
-├── index.html
-├── vite.config.js
-└── package.json
+WiFiGuard/
+├── frontend/                # Vue 3 SPA
+│   ├── src/
+│   │   ├── api/index.js     # 15 个 REST API 接口定义
+│   │   ├── store/alert.js   # Pinia 状态管理
+│   │   ├── views/           # 7 个页面（Dashboard, Alerts, History, Devices, Whitelist, Blacklist, Email）
+│   │   ├── router/index.js  # Vue Router
+│   │   └── App.vue          # 根组件
+│   ├── vite.config.js       # Vite 配置（端口 3000，代理 /api -> :8000）
+│   └── package.json
+├── backend/                 # Flask 后端
+│   ├── app.py               # 入口，Flask 工厂
+│   ├── config.py            # 配置（数据库路径、模拟模式、检测间隔）
+│   ├── database.py          # SQLite 初始化，6 张表
+│   ├── routes/              # API 路由层（system, alerts, devices, whitelist, blacklist, email）
+│   ├── services/            # 业务逻辑层
+│   ├── detection/           # 检测引擎（7 个检测器 + 模拟器）
+│   ├── attack_scripts/      # 攻击演示脚本
+│   ├── utils/               # 工具函数
+│   └── requirements.txt     # Python 依赖
+└── .gitignore
 ```
 
 ## 功能模块
 
-### 1. 系统概览 (Dashboard)
-- 系统状态显示：正在初始化 / 监听中
-- 当前告警数量统计
-- 在线设备数量统计
-- 历史告警数量统计
-- 快速安全建议展示
-- 快捷配置入口
+### 前端（Vue 3 + Element Plus + Pinia）
 
-### 2. 当前告警 (Alerts)
-- 实时告警列表
-- 攻击类型分类（Deauth攻击、钓鱼AP、暴力破解等7类）
-- 严重等级标识（严重/高危/中危/低危）
-- 安全建议详情
-- 告警处理功能
+| 页面 | 功能 |
+|------|------|
+| 系统概览 Dashboard | 系统状态、告警/设备数量统计、安全建议、快捷配置入口 |
+| 当前告警 Alerts | 实时告警列表、7 种攻击类型、严重等级、安全建议、告警处理 |
+| 历史告警 History | 历史记录查询、攻击类型/日期/状态筛选、详情查看 |
+| 在线设备 Devices | 在线设备列表、信号强度可视化、正常/可疑标识、快速加入黑白名单 |
+| 设备白名单 Whitelist | 可信设备管理，白名单内设备不触发告警 |
+| 设备黑名单 Blacklist | 威胁设备管理，黑名单设备触发高危告警 |
+| 邮箱推送 Email | QQ/163/Gmail SMTP 配置、连接测试、推送记录 |
 
-### 3. 历史告警 (History)
-- 历史告警记录查询
-- 日期范围筛选
-- 攻击类型筛选
-- 处理状态筛选
-- 告警详情查看
+### 后端攻击检测（7 种）
 
-### 4. 在线设备 (Devices)
-- 实时在线设备列表
-- MAC地址、IP地址、SSID显示
-- 信号强度可视化
-- 设备状态标识（正常/可疑）
-- 快速加入白名单/黑名单
+| 检测模块 | 说明 | 严重等级 |
+|----------|------|----------|
+| Deauth 攻击 | 检测去认证帧泛洪，区分正常断连与恶意攻击 | high |
+| Evil Twin 钓鱼 | 检测同 SSID 不同 BSSID 的伪造 AP | critical |
+| Flood 泛洪 | 检测异常高频数据包传输 | medium |
+| 暴力破解 | 检测短时间内大量认证失败 | medium |
+| 非法接入 | 检测不在白名单中的新设备接入 | high |
+| 弱口令风险 | 评估当前 WiFi 密码强度 | low |
+| KRACK 风险 | 检测 WEP/WPA/TKIP 等不安全加密协议 | critical |
 
-### 5. 设备白名单 (Whitelist)
-- 白名单设备管理
-- 添加/编辑/移除设备
-- MAC地址和设备名称配置
+### 后端 API（15 个端点）
 
-### 6. 设备黑名单 (Blacklist)
-- 黑名单设备管理
-- 添加/编辑/移除设备
-- 加入原因记录
-
-### 7. 邮箱推送 (Email)
-- SMTP服务器配置
-- 邮箱授权码配置
-- 收件邮箱配置
-- 推送开关控制
-- 连接测试功能
-- 推送记录查看
-- 主流邮箱配置指南（QQ/163/Gmail）
+```
+GET    /api/system/status
+GET    /api/alerts/current
+GET    /api/alerts/history
+POST   /api/alerts/:id/clear
+GET    /api/devices/online
+GET    /api/devices/whitelist
+POST   /api/devices/whitelist
+DELETE /api/devices/whitelist/:mac
+GET    /api/devices/blacklist
+POST   /api/devices/blacklist
+DELETE /api/devices/blacklist/:mac
+GET    /api/email/config
+PUT    /api/email/config
+POST   /api/email/test
+GET    /api/email/records
+```
 
 ## 安装和运行
 
 ### 环境要求
-- Node.js >= 16.0.0
-- npm >= 8.0.0
 
-### 安装依赖
+**前端：** Node.js >= 16, npm >= 8
+**后端：** Python 3.11, miniconda
+
+### 后端
+
+```bash
+# 创建 conda 环境
+conda create -n wifiguard python=3.11 -y
+conda activate wifiguard
+
+# 安装依赖
+cd backend
+pip install -r requirements.txt
+
+# 启动（默认模拟模式，无需监听网卡）
+python app.py
+```
+
+后端运行在 `http://localhost:8000`。模拟模式下检测引擎会自动生成虚拟设备数据和攻击告警。
+
+**环境变量：**
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `WIFIGUARD_DB` | `backend/data/wifiguard.db` | SQLite 数据库路径 |
+| `WIFIGUARD_IFACE` | `wlan1mon` | 监听网卡（非模拟模式） |
+| `WIFIGUARD_SIM` | `true` | 模拟模式开关，开发时保持 `true` |
+| `WIFIGUARD_INTERVAL` | `2` | 检测间隔（秒） |
+| `WIFIGUARD_SMTP_HOST` | `smtp.qq.com` | 邮件 SMTP 服务器 |
+| `WIFIGUARD_SMTP_PORT` | `465` | SMTP 端口 |
+
+### 前端
 
 ```bash
 cd frontend
 npm install
-```
-
-### 开发模式
-
-```bash
 npm run dev
 ```
 
-访问 http://localhost:3000
+访问 `http://localhost:3000`，Vite 自动代理 `/api` 到后端 `:8000`。
 
-### 生产构建
-
-```bash
-npm run build
-```
-
-### 预览构建结果
+### 生产部署
 
 ```bash
-npm run preview
+# 构建前端
+cd frontend && npm run build
+
+# 将 dist/ 部署到 Flask 静态目录，或使用 nginx 反向代理
 ```
 
-## API接口说明
+## 攻击演示脚本
 
-前端通过 `/api` 路径代理访问后端API，后端服务默认运行在 `http://localhost:8000`。
+以下脚本需要在树莓派 + 监听网卡（monitor 模式）环境下运行：
 
-主要接口：
-- `GET /api/system/status` - 获取系统状态
-- `GET /api/alerts/current` - 获取当前告警
-- `GET /api/alerts/history` - 获取历史告警
-- `GET /api/devices/online` - 获取在线设备
-- `GET /api/devices/whitelist` - 获取白名单
-- `POST /api/devices/whitelist` - 添加到白名单
-- `DELETE /api/devices/whitelist/:mac` - 从白名单移除
-- `GET /api/devices/blacklist` - 获取黑名单
-- `POST /api/devices/blacklist` - 添加到黑名单
-- `DELETE /api/devices/blacklist/:mac` - 从黑名单移除
-- `GET /api/email/config` - 获取邮箱配置
-- `PUT /api/email/config` - 更新邮箱配置
-- `POST /api/email/test` - 测试邮箱连接
+```bash
+cd backend/attack_scripts
 
-## 注意事项
+# 单独测试
+sudo ./simulate_deauth.sh wlan1mon
+sudo ./simulate_evil_twin.sh wlan1
+sudo ./simulate_flood.sh wlan1mon
+sudo ./simulate_brute_force.sh wlan1mon
+sudo ./simulate_illegal.sh wlan1
 
-1. 当前版本使用模拟数据进行演示，实际使用时需要连接后端API
-2. 邮箱配置中的授权码不是邮箱密码，需要在邮箱设置中生成
-3. 建议在封闭测试环境中进行攻击模拟测试
+# 完整演示
+sudo ./simulate_all.sh wlan1mon
+```

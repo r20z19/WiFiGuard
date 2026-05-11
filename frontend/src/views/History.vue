@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useAlertStore } from '../store/alert'
 
 const alertStore = useAlertStore()
@@ -104,6 +104,25 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const detailVisible = ref(false)
 const selectedAlert = ref(null)
+
+onMounted(() => {
+  fetchWithFilters()
+})
+
+watch([filterType, filterStatus], () => {
+  fetchWithFilters()
+})
+
+function fetchWithFilters() {
+  const params = {}
+  if (filterType.value) params.type = filterType.value
+  if (filterStatus.value) params.status = filterStatus.value
+  if (dateRange.value && dateRange.value.length === 2) {
+    params.startDate = dateRange.value[0]
+    params.endDate = dateRange.value[1]
+  }
+  alertStore.fetchHistoryAlerts(params)
+}
 
 const filteredAlerts = computed(() => {
   let alerts = [...alertStore.historyAlerts]

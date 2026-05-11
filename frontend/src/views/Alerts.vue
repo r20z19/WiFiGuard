@@ -96,12 +96,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const alertStore = useAlertStore()
 const activeSuggestions = ref([])
+
+onMounted(() => {
+  alertStore.fetchCurrentAlerts()
+})
 
 const getSeverityType = (severity) => {
   const map = {
@@ -152,8 +156,10 @@ const clearAllAlerts = () => {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
-    alertStore.currentAlerts = []
+  }).then(async () => {
+    for (const alert of [...alertStore.currentAlerts]) {
+      await alertStore.clearAlert(alert.id)
+    }
     ElMessage.success('所有告警已清空')
   }).catch(() => {})
 }
