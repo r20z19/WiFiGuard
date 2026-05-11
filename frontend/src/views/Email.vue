@@ -152,11 +152,17 @@ async function refreshRecords() {
   } catch { /* ignore */ }
 }
 
-const handleToggle = (enabled) => {
-  if (enabled) {
-    ElMessage.success('邮箱推送已启用')
-  } else {
-    ElMessage.info('邮箱推送已停用')
+const handleToggle = async (enabled) => {
+  try {
+    await alertStore.updateEmailConfig({ ...alertStore.emailConfig, enabled })
+    if (enabled) {
+      ElMessage.success('邮箱推送已启用')
+    } else {
+      ElMessage.info('邮箱推送已停用')
+    }
+  } catch {
+    alertStore.emailConfig.enabled = !enabled
+    ElMessage.error('保存失败，请重试')
   }
 }
 

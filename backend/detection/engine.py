@@ -96,5 +96,5 @@ class DetectionEngine:
                     timestamp=alert["timestamp"],
                     suggestion=alert.get("suggestion", ""),
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[Email] 发送失败: {e}")
