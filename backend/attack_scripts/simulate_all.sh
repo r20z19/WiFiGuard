@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 INTERFACE="${1:-wlan1mon}"
 
@@ -12,22 +14,21 @@ echo "请确保 $INTERFACE 已处于 monitor 模式。"
 echo "按 Ctrl+C 可随时停止。"
 echo ""
 
-ATTACKS=(
-    "模拟Deauth攻击:$SCRIPT_DIR/simulate_deauth.sh $INTERFACE"
-    "模拟Evil Twin攻击:$SCRIPT_DIR/simulate_evil_twin.sh $INTERFACE"
-    "模拟Flood泛洪:$SCRIPT_DIR/simulate_flood.sh $INTERFACE"
-    "模拟暴力破解:$SCRIPT_DIR/simulate_brute_force.sh $INTERFACE"
-    "模拟非法接入:$SCRIPT_DIR/simulate_illegal.sh $INTERFACE"
-)
-
-for attack in "${ATTACKS[@]}"; do
-    NAME="${attack%%:*}"
-    CMD="${attack#*:}"
+run_attack() {
+    local name="$1"
+    local script="$2"
+    shift 2
     echo ""
-    echo "--- $NAME ---"
-    bash "$CMD"
+    echo "--- $name ---"
+    bash "$script" "$@"
     sleep 5
-done
+}
+
+run_attack "模拟Deauth攻击"     "$SCRIPT_DIR/simulate_deauth.sh"      "$INTERFACE"
+run_attack "模拟Evil Twin攻击"  "$SCRIPT_DIR/simulate_evil_twin.sh"   "${INTERFACE%mon}"
+run_attack "模拟Flood泛洪"      "$SCRIPT_DIR/simulate_flood.sh"       "$INTERFACE"
+run_attack "模拟暴力破解"       "$SCRIPT_DIR/simulate_brute_force.sh" "$INTERFACE"
+run_attack "模拟非法接入"       "$SCRIPT_DIR/simulate_illegal.sh"     "${INTERFACE%mon}"
 
 echo ""
 echo "============================================"
