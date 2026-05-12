@@ -1,15 +1,18 @@
 # WiFiGuard 前端 - 安装说明
 
-# 1. 安装依赖（这里已经安装在了项目代码中，可以不执行）
+# 1. 安装依赖
+
 npm install
 
 # 2. 启动开发服务器
+
 npm run dev
 
 ## 成功后访问
 
 启动成功后，在浏览器访问：
-- http://localhost:3000
+
+- <http://localhost:3000>
 
 ## 完整的功能模块
 

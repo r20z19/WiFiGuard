@@ -8,17 +8,19 @@
 WiFiGuard/
 ├── frontend/                # Vue 3 SPA
 │   ├── src/
-│   │   ├── api/index.js     # 15 个 REST API 接口定义
-│   │   ├── store/alert.js   # Pinia 状态管理
-│   │   ├── views/           # 7 个页面
-│   │   ├── router/index.js  # Vue Router
+│   │   ├── api/index.js     # API 接口定义（含认证接口）
+│   │   ├── store/
+│   │   │   ├── alert.js     # Pinia 状态管理（告警/设备）
+│   │   │   └── auth.js      # 认证状态管理
+│   │   ├── views/           # 8 个页面（含登录页）
+│   │   ├── router/index.js  # Vue Router（含路由守卫）
 │   │   └── App.vue          # 根组件
 │   ├── vite.config.js       # 端口 3000，代理 /api -> :8000
 │   └── package.json
 ├── backend/                 # Flask 后端
 │   ├── app.py               # 入口，Flask 工厂
 │   ├── config.py            # 配置（可通过环境变量覆盖）
-│   ├── database.py          # SQLite 初始化，6 张表
+│   ├── database.py          # SQLite 初始化，7 张表（含用户认证）
 │   ├── routes/              # API 路由层
 │   ├── services/            # 业务逻辑层
 │   ├── detection/           # 检测引擎（7 个检测器 + 模拟器）
@@ -34,6 +36,7 @@ WiFiGuard/
 
 | 页面 | 功能 |
 |------|------|
+| 登录 Login | 用户认证，首次登录自动修改默认密码（123123） |
 | 系统概览 Dashboard | 系统状态、告警/设备数量统计、安全建议、快捷配置入口 |
 | 当前告警 Alerts | 实时告警列表、7 种攻击类型、严重等级、安全建议、告警处理 |
 | 历史告警 History | 历史记录查询、攻击类型/日期/状态筛选、详情查看 |
@@ -54,7 +57,17 @@ WiFiGuard/
 | 弱口令风险 | 评估当前 WiFi 密码强度 | low |
 | KRACK 风险 | 检测 WEP/WPA/TKIP 等不安全加密协议 | critical |
 
-## 后端 API（15 个端点）
+## 后端 API（18 个端点）
+
+### 认证接口
+
+```
+POST   /api/auth/login                 # 用户登录 {username, password} -> {token, isFirstLogin}
+GET    /api/auth/verify                # 验证登录状态 -> {valid, username, isFirstLogin}
+POST   /api/auth/change-password       # 修改密码 {oldPassword, newPassword}
+```
+
+### 业务接口
 
 ```
 GET    /api/system/status          # 系统状态
@@ -73,6 +86,8 @@ PUT    /api/email/config           # 更新邮箱配置
 POST   /api/email/test             # 测试邮箱连接
 GET    /api/email/records          # 推送记录
 ```
+
+所有业务接口（除登录外）均需在请求头中携带 `Authorization: Bearer <token>`。
 
 ## 环境要求
 
@@ -171,16 +186,31 @@ npm install
 # 终端 1：启动后端
 conda activate wifiguard
 cd backend
+pip install -r requirements.txt
 python app.py
 # Flask 运行在 http://localhost:8000
 
 # 终端 2：启动前端
 cd frontend
+npm install
 npm run dev
 # Vite 运行在 http://localhost:3000
 ```
 
-打开浏览器访问 `http://localhost:3000`。
+打开浏览器访问 `http://localhost:3000`，自动跳转到登录页面。
+
+### 7. 用户认证
+
+**默认凭据：**
+
+| 字段 | 值 |
+|------|------|
+| 用户名 | `admin` |
+| 初始密码 | `123123` |
+
+首次登录成功后，系统会弹出修改密码对话框，请及时修改默认密码。
+
+每次访问系统时，都需要先登录认证，未登录用户会被自动重定向到登录页面。
 
 ## 运行模式
 
@@ -232,18 +262,6 @@ python app.py
 cd backend/attack_scripts
 
 # 确保网卡处于 monitor 模式
-<<<<<<< HEAD
-sudo airmon-ng start wlan1
-
-# 单独执行
-sudo ./simulate_deauth.sh wlan1mon       # Deauth 去认证攻击
-sudo ./simulate_evil_twin.sh wlan1       # Evil Twin 钓鱼 AP
-sudo ./simulate_flood.sh wlan1mon        # 泛洪攻击
-sudo ./simulate_brute_force.sh wlan1mon  # 暴力破解
-sudo ./simulate_illegal.sh wlan1         # MAC 欺骗非法接入
-
-# 一键完整演示
-=======
 sudo airmon-ng check kill
 sudo airmon-ng start wlan1
 
@@ -298,7 +316,6 @@ sudo ./simulate_brute_force.sh wlan1mon AA:BB:CC:DD:EE:03 /path/to/rockyou.txt
 sudo ./simulate_illegal.sh wlan1 DE:AD:BE:EF:00:01
 
 # 一键完整演示（自动锁定你当前连接的 WiFi，执行前需按 Enter 确认）
->>>>>>> backend
 sudo ./simulate_all.sh wlan1mon
 ```
 

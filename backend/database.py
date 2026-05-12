@@ -1,3 +1,4 @@
+import hashlib
 import os
 import sqlite3
 
@@ -5,6 +6,14 @@ from config import DATABASE_PATH
 
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    is_first_login INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS alerts_current (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     type TEXT NOT NULL,
@@ -86,5 +95,17 @@ def init_db():
     conn.execute(
         "INSERT OR IGNORE INTO email_config (id) VALUES (1)"
     )
+    _init_default_user(conn)
     conn.commit()
     conn.close()
+
+
+def _init_default_user(conn):
+    exists = conn.execute("SELECT id FROM users WHERE username = ?", ("admin",)).fetchone()
+    if not exists:
+        now = "datetime('now')"
+        password_hash = hashlib.sha256("123123".encode("utf-8")).hexdigest()
+        conn.execute(
+            "INSERT INTO users (username, password_hash, is_first_login, created_at) VALUES (?, ?, 1, datetime('now'))",
+            ("admin", password_hash),
+        )

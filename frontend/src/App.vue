@@ -11,11 +11,14 @@
           <el-icon @click="showAlerts" class="icon-btn"><Bell /></el-icon>
         </el-badge>
         <el-dropdown>
-          <el-icon class="icon-btn"><Setting /></el-icon>
+          <span class="user-info">
+            <el-icon class="icon-btn"><User /></el-icon>
+            <span class="username">{{ authStore.userInfo.username }}</span>
+          </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="goToSettings">系统设置</el-dropdown-item>
-              <el-dropdown-item @click="goToEmailConfig">邮箱配置</el-dropdown-item>
+              <el-dropdown-item @click="showChangePassword">修改密码</el-dropdown-item>
+              <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -65,17 +68,64 @@
         <router-view />
       </el-main>
     </el-container>
+
+    <el-dialog
+      v-model="showChangePwdDialog"
+      title="修改密码"
+      width="400px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="changePwdFormRef"
+        :model="changePwdForm"
+        :rules="changePwdRules"
+        label-width="80px"
+      >
+        <el-form-item label="旧密码" prop="oldPassword">
+          <el-input
+            v-model="changePwdForm.oldPassword"
+            type="password"
+            placeholder="请输入旧密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="changePwdForm.newPassword"
+            type="password"
+            placeholder="请输入新密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="changePwdForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showChangePwdDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleUpdatePassword">确认修改</el-button>
+      </template>
+    </el-dialog>
   </el-container>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAlertStore } from './store/alert'
+import { useAuthStore } from './store/auth'
+import { changePassword as apiChangePassword } from './api/index'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
 const alertStore = useAlertStore()
+const authStore = useAuthStore()
 
 const activeMenu = computed(() => route.path)
 const alertCount = computed(() => alertStore.currentAlerts.length)
@@ -103,12 +153,70 @@ const showAlerts = () => {
   router.push('/alerts')
 }
 
-const goToSettings = () => {
-  router.push('/settings')
+const handleLogout = async () => {
+  try {
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    authStore.logout()
+    router.push('/login')
+  } catch {
+  }
 }
 
-const goToEmailConfig = () => {
-  router.push('/email')
+const showChangePwdDialog = ref(false)
+const changePwdFormRef = ref(null)
+
+const changePwdForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+const validateConfirmPassword = (rule, value, callback) => {
+  if (value !== changePwdForm.newPassword) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const changePwdRules = {
+  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入新密码', trigger: 'blur' },
+    { validator: validateConfirmPassword, trigger: 'blur' }
+  ]
+}
+
+const showChangePassword = () => {
+  showChangePwdDialog.value = true
+}
+
+const handleUpdatePassword = async () => {
+  if (!changePwdFormRef.value) return
+  await changePwdFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    try {
+      await apiChangePassword({
+        oldPassword: changePwdForm.oldPassword,
+        newPassword: changePwdForm.newPassword
+      })
+      showChangePwdDialog.value = false
+      ElMessage.success('密码修改成功')
+      changePwdForm.oldPassword = ''
+      changePwdForm.newPassword = ''
+      changePwdForm.confirmPassword = ''
+    } catch (e) {
+      ElMessage.error('密码修改失败，请检查旧密码是否正确')
+    }
+  })
 }
 </script>
 
@@ -165,6 +273,23 @@ const goToEmailConfig = () => {
 .icon-btn:hover {
   color: #67c23a;
   transform: scale(1.1);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: white;
+  transition: all 0.3s;
+}
+
+.user-info:hover {
+  color: #67c23a;
+}
+
+.username {
+  font-size: 14px;
 }
 
 .alert-badge {

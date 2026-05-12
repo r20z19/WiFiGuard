@@ -4,6 +4,7 @@ from routes.devices import devices_bp
 from routes.whitelist import whitelist_bp
 from routes.blacklist import blacklist_bp
 from routes.email import email_bp
+from routes.auth import auth_bp
 
 
 def register_routes(app):
@@ -13,3 +14,4 @@ def register_routes(app):
     app.register_blueprint(whitelist_bp)
     app.register_blueprint(blacklist_bp)
     app.register_blueprint(email_bp)
+    app.register_blueprint(auth_bp)

@@ -7,6 +7,10 @@ const api = axios.create({
 
 api.interceptors.request.use(
   config => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
     return config
   },
   error => {
@@ -19,6 +23,12 @@ api.interceptors.response.use(
     return response.data
   },
   error => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      localStorage.removeItem('isFirstLogin')
+      window.location.href = '/login'
+    }
     console.error('API Error:', error)
     return Promise.reject(error)
   }
@@ -53,5 +63,11 @@ export const testEmailConnection = (data) => api.post('/email/test', data)
 export const getEmailRecords = () => api.get('/email/records')
 
 export const clearAlert = (id) => api.post(`/alerts/${id}/clear`)
+
+export const login = (data) => api.post('/auth/login', data)
+
+export const verifyLogin = () => api.get('/auth/verify')
+
+export const changePassword = (data) => api.post('/auth/change-password', data)
 
 export default api
