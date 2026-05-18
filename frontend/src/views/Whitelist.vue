@@ -105,8 +105,8 @@ const saveDevice = async () => {
       ElMessage.success('设备已加入白名单')
     }
     dialogVisible.value = false
-  } catch {
-    ElMessage.error('操作失败')
+  } catch (e) {
+    ElMessage.error(e.message || '操作失败')
   }
 }
 

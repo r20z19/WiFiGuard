@@ -11,7 +11,19 @@ def get_all():
     ]
 
 
+def is_blacklisted(mac):
+    conn = get_db()
+    row = conn.execute(
+        "SELECT 1 FROM blacklist WHERE mac = ?", (mac,)
+    ).fetchone()
+    conn.close()
+    return row is not None
+
+
 def add(mac, name):
+    if is_blacklisted(mac):
+        return False, "该设备已在黑名单中，无法添加到白名单"
+
     conn = get_db()
     conn.execute(
         "INSERT OR REPLACE INTO whitelist (mac, name, added_at) VALUES (?, ?, ?)",
@@ -19,6 +31,7 @@ def add(mac, name):
     )
     conn.commit()
     conn.close()
+    return True, None
 
 
 def remove(mac):

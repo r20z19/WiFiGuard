@@ -110,8 +110,8 @@ const saveDevice = async () => {
       ElMessage.warning('设备已加入黑名单')
     }
     dialogVisible.value = false
-  } catch {
-    ElMessage.error('操作失败')
+  } catch (e) {
+    ElMessage.error(e.message || '操作失败')
   }
 }
 

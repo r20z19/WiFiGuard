@@ -24,7 +24,10 @@ def add_to_blacklist():
         return jsonify({"error": "设备名称不能为空"}), 400
 
     reason = data.get("reason", "").strip()
-    add(mac, name, reason)
+    success, error_msg = add(mac, name, reason)
+    if not success:
+        return jsonify({"error": error_msg}), 409
+
     return jsonify({"success": True})
 
 

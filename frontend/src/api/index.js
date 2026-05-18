@@ -29,6 +29,9 @@ api.interceptors.response.use(
       localStorage.removeItem('isFirstLogin')
       window.location.href = '/login'
     }
+    if (error.response?.data?.error) {
+      error.message = error.response.data.error
+    }
     console.error('API Error:', error)
     return Promise.reject(error)
   }

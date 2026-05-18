@@ -53,7 +53,7 @@
               type="success"
               link
               @click="addToWhitelist(row)"
-              :disabled="isInWhitelist(row.mac)"
+              :disabled="isInWhitelist(row.mac) || isInBlacklist(row.mac)"
             >
               加入白名单
             </el-button>
@@ -61,7 +61,7 @@
               type="danger"
               link
               @click="addToBlacklist(row)"
-              :disabled="isInBlacklist(row.mac)"
+              :disabled="isInBlacklist(row.mac) || isInWhitelist(row.mac)"
             >
               加入黑名单
             </el-button>
@@ -155,8 +155,10 @@ const addToWhitelist = async (device) => {
       name: `设备-${device.mac.slice(-4)}`
     })
     ElMessage.success(`设备 ${device.mac} 已加入白名单`)
-  } catch {
-    ElMessage.error('加入白名单失败')
+    alertStore.fetchBlacklist()
+    alertStore.fetchWhitelist()
+  } catch (e) {
+    ElMessage.error(e.message || '加入白名单失败')
   }
 }
 
@@ -168,8 +170,10 @@ const addToBlacklist = async (device) => {
       reason: '手动添加'
     })
     ElMessage.warning(`设备 ${device.mac} 已加入黑名单`)
-  } catch {
-    ElMessage.error('加入黑名单失败')
+    alertStore.fetchBlacklist()
+    alertStore.fetchWhitelist()
+  } catch (e) {
+    ElMessage.error(e.message || '加入黑名单失败')
   }
 }
 

@@ -23,7 +23,10 @@ def add_to_whitelist():
     if not name:
         return jsonify({"error": "设备名称不能为空"}), 400
 
-    add(mac, name)
+    success, error_msg = add(mac, name)
+    if not success:
+        return jsonify({"error": error_msg}), 409
+
     return jsonify({"success": True})
 
 
