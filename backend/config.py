@@ -10,6 +10,10 @@ SIMULATION_MODE = os.environ.get("WIFIGUARD_SIM", "true").lower() == "true"
 
 DETECTION_INTERVAL = int(os.environ.get("WIFIGUARD_INTERVAL", "2"))
 
+# Pcap replay mode: when SIMULATION_MODE=false and these are set, read from pcap files
+# Comma-separated list of pcap file paths
+PCAP_FILE_PATHS = os.environ.get("WIFIGUARD_PCAP", "")
+
 EMAIL_SMTP_HOST = os.environ.get("WIFIGUARD_SMTP_HOST", "smtp.qq.com")
 EMAIL_SMTP_PORT = int(os.environ.get("WIFIGUARD_SMTP_PORT", "465"))
 EMAIL_SMTP_TIMEOUT = 10

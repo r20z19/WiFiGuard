@@ -13,7 +13,10 @@
         <h1 class="app-title">WiFiGuard</h1>
         <p class="app-subtitle">智能无线入侵检测与预警系统</p>
       </div>
+
+      <!-- Login form -->
       <el-form
+        v-if="mode === 'login'"
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
@@ -52,8 +55,71 @@
           </el-button>
         </el-form-item>
       </el-form>
+
+      <!-- Register form -->
+      <el-form
+        v-else
+        ref="registerFormRef"
+        :model="registerForm"
+        :rules="registerRules"
+        class="login-form"
+        @submit.prevent="handleRegister"
+      >
+        <el-form-item prop="username">
+          <el-input
+            v-model="registerForm.username"
+            placeholder="请输入用户名（2-32个字符）"
+            size="large"
+            :prefix-icon="User"
+            @keyup.enter="handleRegister"
+          />
+        </el-form-item>
+        <el-form-item prop="password">
+          <el-input
+            v-model="registerForm.password"
+            type="password"
+            placeholder="请输入密码（至少6位）"
+            size="large"
+            show-password
+            :prefix-icon="Lock"
+            @keyup.enter="handleRegister"
+          />
+        </el-form-item>
+        <el-form-item prop="confirmPassword">
+          <el-input
+            v-model="registerForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入密码"
+            size="large"
+            show-password
+            :prefix-icon="Lock"
+            @keyup.enter="handleRegister"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button
+            type="primary"
+            size="large"
+            class="login-button"
+            :loading="loading"
+            @click="handleRegister"
+          >
+            {{ loading ? '注册中...' : '注 册' }}
+          </el-button>
+        </el-form-item>
+      </el-form>
+
+      <div class="mode-switch">
+        <span v-if="mode === 'login'">
+          没有账号？<a href="#" @click.prevent="switchMode('register')">立即注册</a>
+        </span>
+        <span v-else>
+          已有账号？<a href="#" @click.prevent="switchMode('login')">返回登录</a>
+        </span>
+      </div>
     </div>
 
+    <!-- First-login password change dialog -->
     <el-dialog
       v-model="showChangePassword"
       title="修改默认密码"
@@ -96,7 +162,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button type="primary" @click="handleChangePassword">确认修改</el-button>
+        <el-button type="primary" :loading="changingPwd" @click="handleChangePassword">确认修改</el-button>
       </template>
     </el-dialog>
   </div>
@@ -108,11 +174,15 @@ import { useRouter } from 'vue-router'
 import { User, Lock, Monitor, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
+import { changePassword as apiChangePassword } from '../api/index'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const loading = ref(false)
+const changingPwd = ref(false)
+const mode = ref('login')
 const loginFormRef = ref(null)
+const registerFormRef = ref(null)
 const showChangePassword = ref(false)
 const changePwdFormRef = ref(null)
 
@@ -124,6 +194,35 @@ const loginForm = reactive({
 const loginRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+}
+
+const registerForm = reactive({
+  username: '',
+  password: '',
+  confirmPassword: ''
+})
+
+const validateRegisterConfirmPassword = (rule, value, callback) => {
+  if (value !== registerForm.password) {
+    callback(new Error('两次输入的密码不一致'))
+  } else {
+    callback()
+  }
+}
+
+const registerRules = {
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 2, max: 32, message: '用户名长度需在2-32个字符之间', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度至少6位', trigger: 'blur' }
+  ],
+  confirmPassword: [
+    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { validator: validateRegisterConfirmPassword, trigger: 'blur' }
+  ]
 }
 
 const changePwdForm = reactive({
@@ -152,6 +251,15 @@ const changePwdRules = {
   ]
 }
 
+const switchMode = (newMode) => {
+  mode.value = newMode
+  loginForm.username = ''
+  loginForm.password = ''
+  registerForm.username = ''
+  registerForm.password = ''
+  registerForm.confirmPassword = ''
+}
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   await loginFormRef.value.validate(async (valid) => {
@@ -177,20 +285,58 @@ const handleLogin = async () => {
   })
 }
 
+const handleRegister = async () => {
+  if (!registerFormRef.value) return
+  await registerFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    loading.value = true
+    try {
+      const result = await authStore.register({
+        username: registerForm.username,
+        password: registerForm.password
+      })
+      if (result.success) {
+        ElMessage.success('注册成功')
+        if (result.isFirstLogin) {
+          showChangePassword.value = true
+        } else {
+          router.push('/')
+        }
+      } else {
+        ElMessage.error(result.message || '注册失败')
+      }
+    } catch (e) {
+      ElMessage.error('注册失败，请检查网络连接')
+    } finally {
+      loading.value = false
+    }
+  })
+}
+
 const handleChangePassword = async () => {
   if (!changePwdFormRef.value) return
   await changePwdFormRef.value.validate(async (valid) => {
     if (!valid) return
+    changingPwd.value = true
     try {
+      await apiChangePassword({
+        oldPassword: changePwdForm.oldPassword,
+        newPassword: changePwdForm.newPassword
+      })
       authStore.setUserInfo({
-        username: loginForm.username,
+        username: loginForm.username || registerForm.username,
         isFirstLogin: false
       })
       showChangePassword.value = false
       ElMessage.success('密码修改成功')
+      changePwdForm.oldPassword = ''
+      changePwdForm.newPassword = ''
+      changePwdForm.confirmPassword = ''
       router.push('/')
     } catch (e) {
-      ElMessage.error('密码修改失败')
+      ElMessage.error('密码修改失败，请检查旧密码是否正确')
+    } finally {
+      changingPwd.value = false
     }
   })
 }
@@ -343,5 +489,24 @@ const handleChangePassword = async () => {
 
 .tip-icon {
   font-size: 18px;
+}
+
+.mode-switch {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #666;
+}
+
+.mode-switch a {
+  color: #2a5298;
+  text-decoration: none;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.mode-switch a:hover {
+  color: #1e3c72;
+  text-decoration: underline;
 }
 </style>

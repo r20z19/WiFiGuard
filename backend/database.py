@@ -103,8 +103,9 @@ def init_db():
 def _init_default_user(conn):
     exists = conn.execute("SELECT id FROM users WHERE username = ?", ("admin",)).fetchone()
     if not exists:
-        now = "datetime('now')"
-        password_hash = hashlib.sha256("123123".encode("utf-8")).hexdigest()
+        from services.auth_service import _hash_password
+
+        password_hash = _hash_password("123123")
         conn.execute(
             "INSERT INTO users (username, password_hash, is_first_login, created_at) VALUES (?, ?, 1, datetime('now'))",
             ("admin", password_hash),

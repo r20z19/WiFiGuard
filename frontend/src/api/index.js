@@ -27,7 +27,9 @@ api.interceptors.response.use(
       localStorage.removeItem('token')
       localStorage.removeItem('username')
       localStorage.removeItem('isFirstLogin')
-      window.location.href = '/login'
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     if (error.response?.data?.error) {
       error.message = error.response.data.error
@@ -68,6 +70,8 @@ export const getEmailRecords = () => api.get('/email/records')
 export const clearAlert = (id) => api.post(`/alerts/${id}/clear`)
 
 export const login = (data) => api.post('/auth/login', data)
+
+export const register = (data) => api.post('/auth/register', data)
 
 export const verifyLogin = () => api.get('/auth/verify')
 
