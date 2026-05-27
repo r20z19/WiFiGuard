@@ -1,7 +1,7 @@
 import threading
 import time
 
-from config import DETECTION_INTERVAL, SIMULATION_MODE, PCAP_FILE_PATHS
+from config import DETECTION_INTERVAL, SIMULATION_MODE, PCAP_FILE_PATHS, MONITOR_INTERFACE
 from services.alert_service import create_alert
 from services.device_service import bulk_upsert, remove_stale_devices
 from services.whitelist_service import is_whitelisted
@@ -18,6 +18,7 @@ class DetectionEngine:
         self._detectors = []
         self._pcap_frames = []
         self._pcap_frame_index = 0
+        self._live_capture = None
         self._load_detectors()
 
     def _load_detectors(self):
@@ -48,6 +49,14 @@ class DetectionEngine:
         elif SIMULATION_MODE:
             from detection.simulator import SimulatorDataGenerator
             self._simulator = SimulatorDataGenerator()
+        else:
+            try:
+                from detection.packet_reader import LivePacketCapture
+                self._live_capture = LivePacketCapture(MONITOR_INTERFACE)
+                self._live_capture.start()
+                print(f"[Engine] Live capture started on {MONITOR_INTERFACE}")
+            except Exception as e:
+                print(f"[Engine] Live capture failed on {MONITOR_INTERFACE}: {e}")
 
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -82,6 +91,8 @@ class DetectionEngine:
 
     def stop(self):
         self._running = False
+        if self._live_capture:
+            self._live_capture.stop()
 
     def _run_loop(self):
         while self._running:
@@ -90,6 +101,8 @@ class DetectionEngine:
                     self._tick_pcap()
                 elif self._simulator:
                     self._tick_simulation()
+                elif self._live_capture:
+                    self._tick_live()
                 else:
                     self._tick_detectors_only()
 
@@ -143,6 +156,24 @@ class DetectionEngine:
         for detector in self._detectors:
             try:
                 result = detector.analyze(devices)
+                if result:
+                    source = result.get("sourceMac", result.get("source_mac", ""))
+                    if source and is_whitelisted(source):
+                        continue
+                    create_alert(result)
+                    self._maybe_send_email(result)
+            except Exception:
+                pass
+
+    def _tick_live(self):
+        """Drain buffered live capture frames and feed to detectors."""
+        frames = self._live_capture.drain_frames()
+        if not frames:
+            return
+
+        for detector in self._detectors:
+            try:
+                result = detector.analyze(frames)
                 if result:
                     source = result.get("sourceMac", result.get("source_mac", ""))
                     if source and is_whitelisted(source):

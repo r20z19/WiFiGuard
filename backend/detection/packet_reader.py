@@ -1,21 +1,59 @@
 import subprocess
 import os
 import re
+import threading
+import queue
+
+
+TSHARK_FIELDS = [
+    "wlan.fc.type_subtype",
+    "wlan.sa",
+    "wlan.da",
+    "wlan.bssid",
+    "wlan.ssid",
+    "frame.time",
+    "radiotap.dbm_antsignal",
+    "_ws.col.Info",
+]
+
+
+def _parse_tshark_line(line):
+    """Parse a single tshark -T fields output line into a frame dict.
+
+    Returns a dict with keys: frameType, sa, da, bssid, ssid, timestamp,
+    signal, info. Returns None if the frame type field cannot be parsed.
+    """
+    parts = line.split("|")
+    raw = dict(zip(TSHARK_FIELDS, parts))
+
+    fc = raw.get("wlan.fc.type_subtype", "")
+    sa = raw.get("wlan.sa", "")
+    da = raw.get("wlan.da", "")
+    bssid = raw.get("wlan.bssid", "")
+    ssid = raw.get("wlan.ssid", "")
+    timestamp = raw.get("frame.time", "")
+    signal = raw.get("radiotap.dbm_antsignal", "")
+    info = raw.get("_ws.col.Info", "")
+
+    try:
+        fc_int = int(fc, 16)
+    except (ValueError, TypeError):
+        return None
+
+    return {
+        "frameType": fc_int,
+        "sa": sa,
+        "da": da,
+        "bssid": bssid,
+        "ssid": ssid,
+        "timestamp": timestamp,
+        "signal": int(signal) if signal else None,
+        "info": info,
+    }
 
 
 class PacketReader:
     """Reads 802.11 pcap files via tshark and yields parsed frame dicts."""
-
-    TSHARK_FIELDS = [
-        "wlan.fc.type_subtype",
-        "wlan.sa",
-        "wlan.da",
-        "wlan.bssid",
-        "wlan.ssid",
-        "frame.time",
-        "radiotap.dbm_antsignal",
-        "_ws.col.Info",
-    ]
 
     def __init__(self, pcap_path):
         if not os.path.exists(pcap_path):
@@ -31,7 +69,7 @@ class PacketReader:
             "-E", "separator=|",
             "-E", "occurrence=f",
         ]
-        for f in self.TSHARK_FIELDS:
+        for f in TSHARK_FIELDS:
             cmd.extend(["-e", f])
 
         proc = subprocess.Popen(
@@ -45,40 +83,11 @@ class PacketReader:
             line = line.strip()
             if not line:
                 continue
-            frame = self._parse_line(line)
+            frame = _parse_tshark_line(line)
             if frame:
                 yield frame
 
         proc.wait()
-
-    def _parse_line(self, line):
-        parts = line.split("|")
-        raw = dict(zip(self.TSHARK_FIELDS, parts))
-
-        fc = raw.get("wlan.fc.type_subtype", "")
-        sa = raw.get("wlan.sa", "")
-        da = raw.get("wlan.da", "")
-        bssid = raw.get("wlan.bssid", "")
-        ssid = raw.get("wlan.ssid", "")
-        timestamp = raw.get("frame.time", "")
-        signal = raw.get("radiotap.dbm_antsignal", "")
-        info = raw.get("_ws.col.Info", "")
-
-        try:
-            fc_int = int(fc, 16)
-        except (ValueError, TypeError):
-            return None
-
-        return {
-            "frameType": fc_int,
-            "sa": sa,
-            "da": da,
-            "bssid": bssid,
-            "ssid": ssid,
-            "timestamp": timestamp,
-            "signal": int(signal) if signal else None,
-            "info": info,
-        }
 
     def get_beacon_security_info(self):
         """Extract RSN/WPA security info from the first beacon frame.
@@ -174,3 +183,77 @@ CIPHER_AES_CCMP = 4
 CIPHER_WEP104 = 5
 
 AKM_PSK = 2
+
+
+class LivePacketCapture:
+    """Captures 802.11 frames from a live wireless interface using tshark.
+
+    Runs tshark in a background subprocess, reads its stdout in a daemon
+    thread, parses each line into a frame dict, and buffers frames in a
+    thread-safe queue. The engine calls drain_frames() each tick to
+    retrieve all buffered frames.
+    """
+
+    def __init__(self, interface):
+        self.interface = interface
+        self._queue = queue.Queue()
+        self._process = None
+        self._thread = None
+        self._running = False
+
+    def start(self):
+        """Launch tshark and start the background reader thread."""
+        cmd = [
+            "tshark", "-i", self.interface,
+            "-T", "fields",
+            "-E", "separator=|",
+            "-E", "occurrence=f",
+        ]
+        for f in TSHARK_FIELDS:
+            cmd.extend(["-e", f])
+
+        self._process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        self._running = True
+        self._thread = threading.Thread(target=self._read_loop, daemon=True)
+        self._thread.start()
+
+    def _read_loop(self):
+        """Continuously read lines from tshark stdout and enqueue parsed frames."""
+        try:
+            for line in self._process.stdout:
+                if not self._running:
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                frame = _parse_tshark_line(line)
+                if frame:
+                    self._queue.put(frame)
+        except Exception:
+            pass
+
+    def drain_frames(self):
+        """Return all buffered frames as a list. Non-blocking."""
+        frames = []
+        while True:
+            try:
+                frames.append(self._queue.get_nowait())
+            except queue.Empty:
+                break
+        return frames
+
+    def stop(self):
+        """Stop the capture subprocess and clean up."""
+        self._running = False
+        if self._process:
+            self._process.terminate()
+            try:
+                self._process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._process.kill()
+                self._process.wait()

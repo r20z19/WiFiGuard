@@ -138,20 +138,22 @@ sudo apt install -y aircrack-ng hostapd mdk4 macchanger
 ```bash
 # 查看无线网卡
 iwconfig
-# 通常是 wlan0 或 wlan1
+# 找到你的 USB 无线网卡，通常是 wlan1、wlp0s20f0u1 等
 
-# 关闭网卡
-sudo ip link set wlan1 down
+# 使用项目自带的脚本一键切换（推荐）
+sudo ./backend/scripts/setup_monitor.sh <网卡接口名>
 
-# 切换到 monitor 模式（创建 wlan1mon）
-sudo iwconfig wlan1 mode monitor
-# 或使用 airmon-ng
-sudo airmon-ng start wlan1
+# 或手动切换
+sudo ip link set <网卡接口名> down
+sudo iw dev <网卡接口名> set type monitor
+sudo ip link set <网卡接口名> up
 
 # 确认 monitor 模式已启用
-iwconfig wlan1mon
-# 应该显示 Mode:Monitor
+iw dev <网卡接口名> info | grep type
+# 应该显示 type monitor
 ```
+
+**注意**：`setup_monitor.sh` 使用 `iw` 命令，不会重命名网卡。如果习惯使用 `airmon-ng`，它会把网卡重命名为 `wlan1mon`，此时需将 `WIFIGUARD_IFACE` 设置为 `wlan1mon`。
 
 ### 3. 安装 Python 环境
 
@@ -221,23 +223,33 @@ npm run dev
 - 按时间线注入 7 种攻击告警（Deauth、Evil Twin、Flood 等）
 - 适用于开发调试和功能演示
 
-### 监听网卡模式
+### 监听网卡模式（Live 实时监测）
 
-连接真实监听网卡后，关闭模拟模式：
+连接真实监听网卡后，系统通过 tshark 实时抓取 802.11 帧，送入 7 个检测器进行攻击识别。
 
 ```bash
 # 1. 将网卡切换为 monitor 模式
-sudo airmon-ng start wlan1
+sudo ./backend/scripts/setup_monitor.sh <网卡接口名>
 
-# 2. 设置环境变量
+# 2. 设置环境变量并启动后端
 export WIFIGUARD_SIM=false
-export WIFIGUARD_IFACE=wlan1mon
-
-# 3. 启动后端
-python app.py
+export WIFIGUARD_IFACE=<网卡接口名>   # 与上一步一致
+cd backend && python app.py
 ```
 
-此时检测引擎从模拟器切换到真实数据采集（具体采集逻辑在各 detector 的 `analyze()` 方法中实现）。
+工作流程：
+1. `LivePacketCapture` 后台运行 `tshark -i <接口>`，持续抓取 802.11 帧
+2. daemon 线程解析帧并放入线程安全队列
+3. 检测引擎每 2 秒排空队列，将帧批量送入 7 个检测器
+4. 检测器通过滑动时间窗口分析帧数据，超过阈值时产生告警
+
+### Pcap 重放模式
+
+从预录制的 pcap 文件中读取帧进行离线检测，适合回放历史数据或调试：
+
+```bash
+WIFIGUARD_SIM=false WIFIGUARD_PCAP=test/testcase/global-01.cap python app.py
+```
 
 ## 环境变量
 
@@ -246,6 +258,7 @@ python app.py
 | `WIFIGUARD_DB` | `backend/data/wifiguard.db` | SQLite 数据库路径 |
 | `WIFIGUARD_IFACE` | `wlan1mon` | 监听网卡接口名 |
 | `WIFIGUARD_SIM` | `true` | 模拟模式（`true`=无需网卡，`false`=真实监听） |
+| `WIFIGUARD_PCAP` | (空) | Pcap 文件路径（逗号分隔多个），设置后优先于模拟/监听模式 |
 | `WIFIGUARD_INTERVAL` | `2` | 检测引擎轮询间隔（秒） |
 | `WIFIGUARD_SMTP_HOST` | `smtp.qq.com` | 邮件 SMTP 服务器 |
 | `WIFIGUARD_SMTP_PORT` | `465` | SMTP 端口 |
