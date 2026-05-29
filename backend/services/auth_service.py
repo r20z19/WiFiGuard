@@ -118,31 +118,3 @@ def change_user_password(token, old_password, new_password):
     conn.commit()
     conn.close()
     return True, "密码修改成功"
-
-
-def register_user(username, password):
-    conn = get_db()
-    existing = conn.execute(
-        "SELECT id FROM users WHERE username = ?", (username,)
-    ).fetchone()
-    if existing:
-        conn.close()
-        return False, "用户名已存在"
-
-    conn.execute(
-        "INSERT INTO users (username, password_hash, is_first_login, created_at) VALUES (?, ?, 1, datetime('now'))",
-        (username, _hash_password(password)),
-    )
-    conn.commit()
-
-    user = conn.execute(
-        "SELECT id, username, is_first_login FROM users WHERE username = ?",
-        (username,),
-    ).fetchone()
-    conn.close()
-
-    token = _generate_token(user["id"], user["username"])
-    return True, {
-        "token": token,
-        "isFirstLogin": True,
-    }

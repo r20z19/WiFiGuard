@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login as apiLogin, register as apiRegister, verifyLogin as apiVerifyLogin } from '../api/index'
+import { login as apiLogin, verifyLogin as apiVerifyLogin } from '../api/index'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
@@ -51,27 +51,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function register(credentials) {
-    try {
-      const response = await apiRegister(credentials)
-      if (response.token) {
-        setToken(response.token)
-        setUserInfo({
-          username: credentials.username,
-          isFirstLogin: response.isFirstLogin || false
-        })
-        return { success: true, isFirstLogin: response.isFirstLogin || false }
-      }
-      return { success: false, message: response.message || '注册失败' }
-    } catch (e) {
-      const msg = e.response?.data?.message || ''
-      if (msg === '用户名已存在') {
-        return { success: false, message: '该用户名已被注册，请直接登录' }
-      }
-      return { success: false, message: msg || '注册失败，请检查网络连接' }
-    }
-  }
-
   async function verifyLogin() {
     if (!token.value) {
       return { success: false }
@@ -99,7 +78,6 @@ export const useAuthStore = defineStore('auth', () => {
     userInfo,
     isFirstLogin,
     login,
-    register,
     logout,
     verifyLogin,
     setUserInfo

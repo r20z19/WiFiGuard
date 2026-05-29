@@ -71,8 +71,6 @@ export const clearAlert = (id) => api.post(`/alerts/${id}/clear`)
 
 export const login = (data) => api.post('/auth/login', data)
 
-export const register = (data) => api.post('/auth/register', data)
-
 export const verifyLogin = () => api.get('/auth/verify')
 
 export const changePassword = (data) => api.post('/auth/change-password', data)

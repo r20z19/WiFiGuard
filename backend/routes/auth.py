@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request
 
-from services.auth_service import authenticate_user, verify_user_token, change_user_password, register_user
+from services.auth_service import authenticate_user, verify_user_token, change_user_password
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -20,29 +20,6 @@ def login():
     result = authenticate_user(username, password)
     if result is None:
         return jsonify({"message": "用户名或密码错误"}), 401
-
-    return jsonify(result)
-
-
-@auth_bp.route("/api/auth/register", methods=["POST"])
-def register():
-    data = request.get_json()
-    if not data:
-        return jsonify({"message": "请求数据为空"}), 400
-
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-
-    if not username or not password:
-        return jsonify({"message": "用户名和密码不能为空"}), 400
-    if len(username) < 2 or len(username) > 32:
-        return jsonify({"message": "用户名长度需在2-32个字符之间"}), 400
-    if len(password) < 6:
-        return jsonify({"message": "密码长度至少6位"}), 400
-
-    success, result = register_user(username, password)
-    if not success:
-        return jsonify({"message": result}), 400
 
     return jsonify(result)
 

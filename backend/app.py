@@ -9,13 +9,12 @@ from routes import register_routes
 
 from detection.engine import DetectionEngine
 
+
 def create_app():
     app = Flask(__name__)
     CORS(app)
-
     init_db()
     register_routes(app)
-
     return app
 
 

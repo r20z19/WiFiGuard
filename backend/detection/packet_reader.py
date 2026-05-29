@@ -14,6 +14,8 @@ TSHARK_FIELDS = [
     "frame.time",
     "radiotap.dbm_antsignal",
     "_ws.col.Info",
+    "arp.src.proto_ipv4",
+    "ip.src",
 ]
 
 
@@ -40,6 +42,9 @@ def _parse_tshark_line(line):
     except (ValueError, TypeError):
         return None
 
+    arp_ip = raw.get("arp.src.proto_ipv4", "")
+    ip_src = raw.get("ip.src", "")
+
     return {
         "frameType": fc_int,
         "sa": sa,
@@ -49,6 +54,11 @@ def _parse_tshark_line(line):
         "timestamp": timestamp,
         "signal": int(signal) if signal else None,
         "info": info,
+        "pairwiseCipher": raw.get("wlan.rsn.pairwise_cipher", ""),
+        "groupCipher": raw.get("wlan.rsn.group_cipher", ""),
+        "akm": raw.get("wlan.rsn.akm", ""),
+        "tagInterpretation": raw.get("wlan.tag.interpretation", ""),
+        "ip": arp_ip if arp_ip else ip_src,
     }
 
 
@@ -199,12 +209,24 @@ class LivePacketCapture:
         self._queue = queue.Queue()
         self._process = None
         self._thread = None
+        self._thread2 = None
         self._running = False
 
     def start(self):
         """Launch tshark and start the background reader thread."""
+        import time as _time
+
+        if not self._check_monitor_mode():
+            print("[!] 接口 {} 未处于 monitor 模式，请执行:".format(self.interface))
+            print("    sudo airmon-ng check kill")
+            print("    sudo airmon-ng start {}".format(self.interface))
+            print("    然后将 WIFIGUARD_IFACE 设置为新接口名 (通常为 {}mon)".format(self.interface))
+            print("    或运行: sudo ./scripts/setup_monitor.sh {}".format(self.interface))
+            print("")
+
         cmd = [
             "tshark", "-i", self.interface,
+            "-l",
             "-T", "fields",
             "-E", "separator=|",
             "-E", "occurrence=f",
@@ -215,12 +237,28 @@ class LivePacketCapture:
         self._process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
         )
         self._running = True
         self._thread = threading.Thread(target=self._read_loop, daemon=True)
         self._thread.start()
+        self._thread2 = threading.Thread(target=self._stderr_loop, daemon=True)
+        self._thread2.start()
+        self._first_frame_time = _time.time()
+        print("[+] 监听已启动，等待数据帧... (接口: {})".format(self.interface))
+
+    def _check_monitor_mode(self):
+        """Check if the interface is in monitor mode. Returns True if yes."""
+        try:
+            import subprocess as _sp
+            r = _sp.run(
+                ["iw", "dev", self.interface, "info"],
+                capture_output=True, text=True, timeout=5
+            )
+            return "type monitor" in r.stdout.lower()
+        except Exception:
+            return False
 
     def _read_loop(self):
         """Continuously read lines from tshark stdout and enqueue parsed frames."""
@@ -234,6 +272,21 @@ class LivePacketCapture:
                 frame = _parse_tshark_line(line)
                 if frame:
                     self._queue.put(frame)
+                    print('*', end='', flush=True)
+            if self._running:
+                print("[!] tshark 进程已退出，检查上方的 [tshark] 错误信息")
+        except Exception as e:
+            print("[!] 监听读取线程异常: {}".format(e))
+
+    def _stderr_loop(self):
+        """Read tshark stderr for diagnostics."""
+        try:
+            for line in self._process.stderr:
+                if not self._running:
+                    break
+                line = line.strip()
+                if line:
+                    print("[tshark] {}".format(line))
         except Exception:
             pass
 
@@ -257,3 +310,6 @@ class LivePacketCapture:
             except subprocess.TimeoutExpired:
                 self._process.kill()
                 self._process.wait()
+        ret = self._process.poll() if self._process else -1
+        if ret and ret != -15:
+            print("[!] tshark 退出码: {}".format(ret))

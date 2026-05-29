@@ -20,7 +20,8 @@ def upsert_device(device):
     if existing:
         conn.execute(
             """UPDATE devices_online
-               SET ip = ?, ssid = ?, signal = ?, status = ?, last_seen = ?
+               SET ip = ?, ssid = ?, signal = ?, status = ?, last_seen = ?,
+                   vendor = ?, pairwise_cipher = ?, group_cipher = ?, akm = ?
                WHERE mac = ?""",
             (
                 device.get("ip", existing["ip"]),
@@ -28,13 +29,19 @@ def upsert_device(device):
                 device.get("signal", existing["signal"]),
                 device.get("status", existing["status"]),
                 device.get("last_seen", now_str()),
+                device.get("vendor", existing["vendor"]),
+                device.get("pairwiseCipher", existing["pairwise_cipher"]),
+                device.get("groupCipher", existing["group_cipher"]),
+                device.get("akm", existing["akm"]),
                 device["mac"],
             ),
         )
     else:
         conn.execute(
-            """INSERT INTO devices_online (mac, ip, ssid, signal, status, first_seen, last_seen)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO devices_online
+               (mac, ip, ssid, signal, status, first_seen, last_seen,
+                vendor, pairwise_cipher, group_cipher, akm)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 device["mac"],
                 device.get("ip", ""),
@@ -43,6 +50,10 @@ def upsert_device(device):
                 device.get("status", "正常"),
                 device.get("first_seen", now_str()),
                 device.get("last_seen", now_str()),
+                device.get("vendor", ""),
+                device.get("pairwiseCipher", ""),
+                device.get("groupCipher", ""),
+                device.get("akm", ""),
             ),
         )
 
@@ -75,4 +86,8 @@ def _row_to_dict(row):
         "status": row["status"],
         "firstSeen": row["first_seen"],
         "lastSeen": row["last_seen"],
+        "vendor": row["vendor"],
+        "pairwiseCipher": row["pairwise_cipher"],
+        "groupCipher": row["group_cipher"],
+        "akm": row["akm"],
     }
