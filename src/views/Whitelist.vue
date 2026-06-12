@@ -4,20 +4,10 @@
       <template #header>
         <div class="card-header">
           <span>设备白名单管理</span>
-          <div class="header-actions">
-            <el-tag :type="alertStore.isWhitelistEnabled ? 'success' : 'info'" effect="light">
-              {{ alertStore.isWhitelistEnabled ? '已启用' : '未启用' }}
-            </el-tag>
-            <el-switch
-              :model-value="alertStore.isWhitelistEnabled"
-              active-text="启用白名单"
-              @change="handleModeToggle"
-            />
-            <el-button type="primary" size="small" @click="showAddDialog">
-              <el-icon><Plus /></el-icon>
-              添加设备
-            </el-button>
-          </div>
+          <el-button type="primary" size="small" @click="showAddDialog">
+            <el-icon><Plus /></el-icon>
+            添加设备
+          </el-button>
         </div>
       </template>
 
@@ -31,13 +21,6 @@
           <p>白名单中的设备将被视为可信设备，不会触发安全告警。建议将已知的合法设备加入白名单。</p>
         </template>
       </el-alert>
-
-      <el-alert
-        :title="alertStore.isWhitelistEnabled ? '当前启用的是白名单策略，黑名单已自动停用。' : '白名单与黑名单只能启用一个，开启白名单后将自动停用黑名单。'"
-        :type="alertStore.isWhitelistEnabled ? 'success' : 'info'"
-        :closable="false"
-        style="margin-bottom: 20px;"
-      />
 
       <el-table :data="alertStore.whitelist" style="width: 100%" stripe>
         <el-table-column prop="mac" label="MAC地址" width="200">
@@ -76,7 +59,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -86,19 +69,10 @@ const isEdit = ref(false)
 const editingMac = ref('')
 const form = ref({ mac: '', name: '' })
 
-onMounted(() => {
-  alertStore.fetchWhitelist()
-})
-
 const showAddDialog = () => {
   isEdit.value = false
   form.value = { mac: '', name: '' }
   dialogVisible.value = true
-}
-
-const handleModeToggle = (enabled) => {
-  alertStore.toggleListMode('whitelist', enabled)
-  ElMessage.success(enabled ? '白名单已启用，黑名单已自动停用' : '白名单已停用')
 }
 
 const editDevice = (device) => {
@@ -108,28 +82,28 @@ const editDevice = (device) => {
   dialogVisible.value = true
 }
 
-const saveDevice = async () => {
+const saveDevice = () => {
   if (!form.value.mac || !form.value.name) {
     ElMessage.warning('请填写完整信息')
     return
   }
 
-  try {
-    if (isEdit.value) {
-      await alertStore.removeFromWhitelist(editingMac.value)
-      await alertStore.addToWhitelist({ mac: form.value.mac, name: form.value.name })
-      ElMessage.success('设备信息已更新')
-    } else {
-      await alertStore.addToWhitelist({
-        mac: form.value.mac,
-        name: form.value.name
-      })
-      ElMessage.success('设备已加入白名单')
+  if (isEdit.value) {
+    const index = alertStore.whitelist.findIndex(d => d.mac === editingMac.value)
+    if (index !== -1) {
+      alertStore.whitelist[index].name = form.value.name
     }
-    dialogVisible.value = false
-  } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    ElMessage.success('设备信息已更新')
+  } else {
+    alertStore.addToWhitelist({
+      mac: form.value.mac,
+      name: form.value.name,
+      addedAt: new Date().toLocaleString('zh-CN')
+    })
+    ElMessage.success('设备已加入白名单')
   }
+
+  dialogVisible.value = false
 }
 
 const removeDevice = (mac) => {
@@ -137,10 +111,8 @@ const removeDevice = (mac) => {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(async () => {
-    try {
-      await alertStore.removeFromWhitelist(mac)
-    } catch { /* store already refreshed */ }
+  }).then(() => {
+    alertStore.removeFromWhitelist(mac)
     ElMessage.success('设备已从白名单移除')
   }).catch(() => {})
 }
@@ -155,12 +127,6 @@ const removeDevice = (mac) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .mac-address {

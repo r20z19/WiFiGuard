@@ -14,7 +14,7 @@
         <el-table-column prop="timestamp" label="告警时间" width="180" />
         <el-table-column prop="type" label="攻击类型" width="140">
           <template #default="{ row }">
-            <el-tag :type="getAttackTypeColor(row.type)">{{ getAttackTypeLabel(row.type) }}</el-tag>
+            <el-tag :type="getAttackTypeColor(row.type)">{{ row.type }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="severity" label="严重等级" width="100">
@@ -35,12 +35,12 @@
                 <el-button type="primary" link>查看建议</el-button>
               </template>
               <div class="suggestion-popover">
-                <h4>{{ getAttackTypeLabel(row.type) }}</h4>
+                <h4>{{ row.type }}</h4>
                 <p>{{ row.suggestion }}</p>
               </div>
             </el-popover>
             <el-button type="success" link @click="handleClear(row.id)">
-              删除
+              处理
             </el-button>
           </template>
         </el-table-column>
@@ -65,13 +65,13 @@
               <el-tag :type="getSeverityType(alert.severity)" size="small">
                 {{ getSeverityLabel(alert.severity) }}
               </el-tag>
-              <span class="alert-type">{{ getAttackTypeLabel(alert.type) }}</span>
+              <span class="alert-type">{{ alert.type }}</span>
               <span class="alert-time">{{ alert.timestamp }}</span>
             </div>
           </template>
           <div class="suggestion-detail">
             <el-descriptions :column="2" border>
-              <el-descriptions-item label="攻击类型">{{ getAttackTypeLabel(alert.type) }}</el-descriptions-item>
+              <el-descriptions-item label="攻击类型">{{ alert.type }}</el-descriptions-item>
               <el-descriptions-item label="严重等级">{{ getSeverityLabel(alert.severity) }}</el-descriptions-item>
               <el-descriptions-item label="源MAC地址">{{ alert.sourceMac }}</el-descriptions-item>
               <el-descriptions-item label="目标MAC地址">{{ alert.targetMac }}</el-descriptions-item>
@@ -96,16 +96,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const alertStore = useAlertStore()
 const activeSuggestions = ref([])
-
-onMounted(() => {
-  alertStore.fetchCurrentAlerts()
-})
 
 const getSeverityType = (severity) => {
   const map = {
@@ -140,19 +136,14 @@ const getAttackTypeColor = (type) => {
   return map[type] || 'info'
 }
 
-const getAttackTypeLabel = (type) => {
-  if (type === 'KRACK风险') return '弱加密协议'
-  return type
-}
-
 const handleClear = (id) => {
-  ElMessageBox.confirm('确认删除此告警？', '提示', {
-    confirmButtonText: '删除',
+  ElMessageBox.confirm('确认已处理此告警？', '提示', {
+    confirmButtonText: '确认',
     cancelButtonText: '取消',
-    type: 'warning'
+    type: 'success'
   }).then(() => {
     alertStore.clearAlert(id)
-    ElMessage.success('告警已删除')
+    ElMessage.success('告警已处理')
   }).catch(() => {})
 }
 
@@ -161,10 +152,8 @@ const clearAllAlerts = () => {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(async () => {
-    for (const alert of [...alertStore.currentAlerts]) {
-      await alertStore.clearAlert(alert.id)
-    }
+  }).then(() => {
+    alertStore.currentAlerts = []
     ElMessage.success('所有告警已清空')
   }).catch(() => {})
 }

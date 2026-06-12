@@ -4,20 +4,10 @@
       <template #header>
         <div class="card-header">
           <span>设备黑名单管理</span>
-          <div class="header-actions">
-            <el-tag :type="alertStore.isBlacklistEnabled ? 'danger' : 'info'" effect="light">
-              {{ alertStore.isBlacklistEnabled ? '已启用' : '未启用' }}
-            </el-tag>
-            <el-switch
-              :model-value="alertStore.isBlacklistEnabled"
-              active-text="启用黑名单"
-              @change="handleModeToggle"
-            />
-            <el-button type="danger" size="small" @click="showAddDialog">
-              <el-icon><Plus /></el-icon>
-              添加设备
-            </el-button>
-          </div>
+          <el-button type="danger" size="small" @click="showAddDialog">
+            <el-icon><Plus /></el-icon>
+            添加设备
+          </el-button>
         </div>
       </template>
 
@@ -31,13 +21,6 @@
           <p>黑名单中的设备将被标记为威胁设备，一旦检测到将立即触发安全告警。建议将已知的攻击设备或可疑设备加入黑名单。</p>
         </template>
       </el-alert>
-
-      <el-alert
-        :title="alertStore.isBlacklistEnabled ? '当前启用的是黑名单策略，白名单已自动停用。' : '白名单与黑名单只能启用一个，开启黑名单后将自动停用白名单。'"
-        :type="alertStore.isBlacklistEnabled ? 'error' : 'info'"
-        :closable="false"
-        style="margin-bottom: 20px;"
-      />
 
       <el-table :data="alertStore.blacklist" style="width: 100%" stripe>
         <el-table-column prop="mac" label="MAC地址" width="200">
@@ -80,7 +63,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -90,19 +73,10 @@ const isEdit = ref(false)
 const editingMac = ref('')
 const form = ref({ mac: '', name: '', reason: '' })
 
-onMounted(() => {
-  alertStore.fetchBlacklist()
-})
-
 const showAddDialog = () => {
   isEdit.value = false
   form.value = { mac: '', name: '', reason: '' }
   dialogVisible.value = true
-}
-
-const handleModeToggle = (enabled) => {
-  alertStore.toggleListMode('blacklist', enabled)
-  ElMessage.success(enabled ? '黑名单已启用，白名单已自动停用' : '黑名单已停用')
 }
 
 const editDevice = (device) => {
@@ -112,29 +86,30 @@ const editDevice = (device) => {
   dialogVisible.value = true
 }
 
-const saveDevice = async () => {
+const saveDevice = () => {
   if (!form.value.mac || !form.value.name || !form.value.reason) {
     ElMessage.warning('请填写完整信息')
     return
   }
 
-  try {
-    if (isEdit.value) {
-      await alertStore.removeFromBlacklist(editingMac.value)
-      await alertStore.addToBlacklist({ mac: form.value.mac, name: form.value.name, reason: form.value.reason })
-      ElMessage.success('设备信息已更新')
-    } else {
-      await alertStore.addToBlacklist({
-        mac: form.value.mac,
-        name: form.value.name,
-        reason: form.value.reason
-      })
-      ElMessage.warning('设备已加入黑名单')
+  if (isEdit.value) {
+    const index = alertStore.blacklist.findIndex(d => d.mac === editingMac.value)
+    if (index !== -1) {
+      alertStore.blacklist[index].name = form.value.name
+      alertStore.blacklist[index].reason = form.value.reason
     }
-    dialogVisible.value = false
-  } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    ElMessage.success('设备信息已更新')
+  } else {
+    alertStore.addToBlacklist({
+      mac: form.value.mac,
+      name: form.value.name,
+      reason: form.value.reason,
+      addedAt: new Date().toLocaleString('zh-CN')
+    })
+    ElMessage.warning('设备已加入黑名单')
   }
+
+  dialogVisible.value = false
 }
 
 const removeDevice = (mac) => {
@@ -142,10 +117,8 @@ const removeDevice = (mac) => {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(async () => {
-    try {
-      await alertStore.removeFromBlacklist(mac)
-    } catch { /* store already refreshed */ }
+  }).then(() => {
+    alertStore.removeFromBlacklist(mac)
     ElMessage.success('设备已从黑名单移除')
   }).catch(() => {})
 }
@@ -160,12 +133,6 @@ const removeDevice = (mac) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .mac-address {

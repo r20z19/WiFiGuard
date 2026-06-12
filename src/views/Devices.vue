@@ -21,21 +21,6 @@
         </div>
       </template>
 
-      <div class="list-policy-bar">
-        <span class="policy-label">名单策略</span>
-        <el-switch
-          :model-value="alertStore.isWhitelistEnabled"
-          active-text="启用白名单"
-          @change="(enabled) => handleListModeToggle('whitelist', enabled)"
-        />
-        <el-switch
-          :model-value="alertStore.isBlacklistEnabled"
-          active-text="启用黑名单"
-          @change="(enabled) => handleListModeToggle('blacklist', enabled)"
-        />
-        <el-tag type="info" effect="light">当前：{{ alertStore.activeListLabel }}</el-tag>
-      </div>
-
       <el-table :data="filteredDevices" style="width: 100%" stripe>
         <el-table-column prop="mac" label="MAC地址" width="180">
           <template #default="{ row }">
@@ -68,7 +53,7 @@
               type="success"
               link
               @click="addToWhitelist(row)"
-              :disabled="!alertStore.isWhitelistEnabled || isInWhitelist(row.mac) || isInBlacklist(row.mac)"
+              :disabled="isInWhitelist(row.mac)"
             >
               加入白名单
             </el-button>
@@ -76,7 +61,7 @@
               type="danger"
               link
               @click="addToBlacklist(row)"
-              :disabled="!alertStore.isBlacklistEnabled || isInBlacklist(row.mac) || isInWhitelist(row.mac)"
+              :disabled="isInBlacklist(row.mac)"
             >
               加入黑名单
             </el-button>
@@ -116,18 +101,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage } from 'element-plus'
 
 const alertStore = useAlertStore()
 const searchQuery = ref('')
-
-onMounted(() => {
-  alertStore.fetchOnlineDevices()
-  alertStore.fetchWhitelist()
-  alertStore.fetchBlacklist()
-})
 
 const filteredDevices = computed(() => {
   if (!searchQuery.value) return alertStore.onlineDevices
@@ -163,46 +142,26 @@ const isInBlacklist = (mac) => {
   return alertStore.blacklist.some(d => d.mac === mac)
 }
 
-const handleListModeToggle = (mode, enabled) => {
-  alertStore.toggleListMode(mode, enabled)
-  if (!enabled) {
-    ElMessage.success(`${mode === 'whitelist' ? '白名单' : '黑名单'}已停用`)
-    return
-  }
-  ElMessage.success(`${mode === 'whitelist' ? '白名单' : '黑名单'}已启用，另一名单已自动停用`)
+const addToWhitelist = (device) => {
+  alertStore.addToWhitelist({
+    mac: device.mac,
+    name: `设备-${device.mac.slice(-4)}`,
+    addedAt: new Date().toLocaleString('zh-CN')
+  })
+  ElMessage.success(`设备 ${device.mac} 已加入白名单`)
 }
 
-const addToWhitelist = async (device) => {
-  try {
-    await alertStore.addToWhitelist({
-      mac: device.mac,
-      name: `设备-${device.mac.slice(-4)}`
-    })
-    ElMessage.success(`设备 ${device.mac} 已加入白名单`)
-    alertStore.fetchBlacklist()
-    alertStore.fetchWhitelist()
-  } catch (e) {
-    ElMessage.error(e.message || '加入白名单失败')
-  }
-}
-
-const addToBlacklist = async (device) => {
-  try {
-    await alertStore.addToBlacklist({
-      mac: device.mac,
-      name: `设备-${device.mac.slice(-4)}`,
-      reason: '手动添加'
-    })
-    ElMessage.warning(`设备 ${device.mac} 已加入黑名单`)
-    alertStore.fetchBlacklist()
-    alertStore.fetchWhitelist()
-  } catch (e) {
-    ElMessage.error(e.message || '加入黑名单失败')
-  }
+const addToBlacklist = (device) => {
+  alertStore.addToBlacklist({
+    mac: device.mac,
+    name: `设备-${device.mac.slice(-4)}`,
+    reason: '手动添加',
+    addedAt: new Date().toLocaleString('zh-CN')
+  })
+  ElMessage.warning(`设备 ${device.mac} 已加入黑名单`)
 }
 
 const refreshDevices = () => {
-  alertStore.fetchOnlineDevices()
   ElMessage.success('设备列表已刷新')
 }
 </script>
@@ -221,22 +180,6 @@ const refreshDevices = () => {
 .header-actions {
   display: flex;
   align-items: center;
-}
-
-.list-policy-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  flex-wrap: wrap;
-}
-
-.policy-label {
-  font-weight: 600;
-  color: #303133;
 }
 
 .mac-address {

@@ -63,11 +63,7 @@
           </template>
 
           <el-table :data="alertStore.currentAlerts.slice(0, 5)" style="width: 100%">
-            <el-table-column prop="type" label="攻击类型" width="120">
-              <template #default="{ row }">
-                {{ getAttackTypeLabel(row.type) }}
-              </template>
-            </el-table-column>
+            <el-table-column prop="type" label="攻击类型" width="120" />
             <el-table-column prop="severity" label="严重等级" width="100">
               <template #default="{ row }">
                 <el-tag :type="getSeverityType(row.severity)" size="small">
@@ -79,8 +75,8 @@
             <el-table-column prop="timestamp" label="时间" width="180" />
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
-                <el-button type="danger" link @click="handleDeleteAlert(row.id)">
-                  删除
+                <el-button type="primary" link @click="alertStore.clearAlert(row.id)">
+                  处理
                 </el-button>
               </template>
             </el-table-column>
@@ -96,7 +92,7 @@
 
           <div v-if="currentSuggestion" class="suggestion-content">
             <el-alert
-              :title="getAttackTypeLabel(currentSuggestion.type)"
+              :title="currentSuggestion.type"
               :type="getSeverityType(currentSuggestion.severity)"
               :closable="false"
               show-icon
@@ -159,30 +155,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useAlertStore } from '../store/alert'
-import { ElMessage, ElMessageBox } from 'element-plus'
 
 const alertStore = useAlertStore()
 
-onMounted(() => {
-  alertStore.fetchSystemStatus()
-  alertStore.fetchCurrentAlerts()
-  alertStore.fetchOnlineDevices()
-  alertStore.fetchWhitelist()
-  alertStore.fetchBlacklist()
-  alertStore.fetchEmailConfig()
-})
-
 const systemStatus = computed(() => {
-  const s = alertStore.systemStatus
-  if (s.status === 'listening') {
-    return { text: '监听中', class: 'success' }
+  return {
+    text: '监听中',
+    class: 'success'
   }
-  if (s.status === 'initializing') {
-    return { text: '初始化中', class: 'warning' }
-  }
-  return { text: s.status, class: 'info' }
 })
 
 const currentSuggestion = computed(() => {
@@ -207,22 +189,6 @@ const getSeverityLabel = (severity) => {
     low: '低危'
   }
   return map[severity] || severity
-}
-
-const getAttackTypeLabel = (type) => {
-  if (type === 'KRACK风险') return '弱加密协议'
-  return type
-}
-
-const handleDeleteAlert = (id) => {
-  ElMessageBox.confirm('确认删除此告警？', '提示', {
-    confirmButtonText: '删除',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    await alertStore.clearAlert(id)
-    ElMessage.success('告警已删除')
-  }).catch(() => {})
 }
 </script>
 
