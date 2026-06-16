@@ -4,10 +4,19 @@
       <template #header>
         <div class="card-header">
           <span>设备白名单管理</span>
-          <el-button type="primary" size="small" @click="showAddDialog">
-            <el-icon><Plus /></el-icon>
-            添加设备
-          </el-button>
+          <div class="header-actions">
+            <el-switch
+              :model-value="alertStore.accessListMode === 'whitelist'"
+              @change="toggleWhitelistMode"
+              active-text="已启用"
+              inactive-text="未启用"
+              style="margin-right: 12px;"
+            />
+            <el-button type="primary" size="small" @click="showAddDialog">
+              <el-icon><Plus /></el-icon>
+              添加设备
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -69,6 +78,16 @@ const isEdit = ref(false)
 const editingMac = ref('')
 const form = ref({ mac: '', name: '' })
 
+const toggleWhitelistMode = (enabled) => {
+  const prev = alertStore.accessListMode
+  alertStore.setAccessListMode(enabled ? 'whitelist' : '')
+  if (enabled) {
+    ElMessage.success(prev === 'blacklist' ? '已切换为白名单模式' : '已启用白名单模式')
+    return
+  }
+  ElMessage.info('已关闭名单控制')
+}
+
 const showAddDialog = () => {
   isEdit.value = false
   form.value = { mac: '', name: '' }
@@ -126,6 +145,11 @@ const removeDevice = (mac) => {
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.header-actions {
+  display: flex;
   align-items: center;
 }
 

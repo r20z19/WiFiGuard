@@ -14,7 +14,7 @@
         <el-table-column prop="timestamp" label="告警时间" width="180" />
         <el-table-column prop="type" label="攻击类型" width="140">
           <template #default="{ row }">
-            <el-tag :type="getAttackTypeColor(row.type)">{{ getAttackTypeLabel(row.type) }}</el-tag>
+            <el-tag :type="getAttackTypeColor(row.type)">{{ row.type }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="severity" label="严重等级" width="100">
@@ -35,11 +35,11 @@
                 <el-button type="primary" link>查看建议</el-button>
               </template>
               <div class="suggestion-popover">
-                <h4>{{ getAttackTypeLabel(row.type) }}</h4>
+                <h4>{{ row.type }}</h4>
                 <p>{{ row.suggestion }}</p>
               </div>
             </el-popover>
-            <el-button type="success" link @click="handleClear(row.id)">
+            <el-button type="danger" link @click="handleDelete(row.id)">
               删除
             </el-button>
           </template>
@@ -65,13 +65,13 @@
               <el-tag :type="getSeverityType(alert.severity)" size="small">
                 {{ getSeverityLabel(alert.severity) }}
               </el-tag>
-              <span class="alert-type">{{ getAttackTypeLabel(alert.type) }}</span>
+              <span class="alert-type">{{ alert.type }}</span>
               <span class="alert-time">{{ alert.timestamp }}</span>
             </div>
           </template>
           <div class="suggestion-detail">
             <el-descriptions :column="2" border>
-              <el-descriptions-item label="攻击类型">{{ getAttackTypeLabel(alert.type) }}</el-descriptions-item>
+              <el-descriptions-item label="攻击类型">{{ alert.type }}</el-descriptions-item>
               <el-descriptions-item label="严重等级">{{ getSeverityLabel(alert.severity) }}</el-descriptions-item>
               <el-descriptions-item label="源MAC地址">{{ alert.sourceMac }}</el-descriptions-item>
               <el-descriptions-item label="目标MAC地址">{{ alert.targetMac }}</el-descriptions-item>
@@ -135,19 +135,15 @@ const getAttackTypeColor = (type) => {
     '非法接入': 'danger',
     'Flood泛洪': 'warning',
     '弱口令': 'info',
+    '弱加密协议': 'info',
     'KRACK风险': 'danger'
   }
   return map[type] || 'info'
 }
 
-const getAttackTypeLabel = (type) => {
-  if (type === 'KRACK风险') return '弱加密协议'
-  return type
-}
-
-const handleClear = (id) => {
+const handleDelete = (id) => {
   ElMessageBox.confirm('确认删除此告警？', '提示', {
-    confirmButtonText: '删除',
+    confirmButtonText: '确认',
     cancelButtonText: '取消',
     type: 'warning'
   }).then(() => {

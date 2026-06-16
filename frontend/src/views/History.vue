@@ -22,7 +22,8 @@
               <el-option label="非法接入" value="非法接入" />
               <el-option label="Flood泛洪" value="Flood泛洪" />
               <el-option label="弱口令" value="弱口令" />
-              <el-option label="弱加密协议" value="KRACK风险" />
+              <el-option label="弱加密协议" value="弱加密协议" />
+              <el-option label="KRACK风险" value="KRACK风险" />
             </el-select>
             <el-select v-model="filterStatus" placeholder="处理状态" size="small" clearable style="width: 120px;">
               <el-option label="全部" value="" />
@@ -37,7 +38,7 @@
         <el-table-column prop="timestamp" label="告警时间" width="180" />
         <el-table-column prop="type" label="攻击类型" width="140">
           <template #default="{ row }">
-            <el-tag :type="getAttackTypeColor(row.type)">{{ getAttackTypeLabel(row.type) }}</el-tag>
+            <el-tag :type="getAttackTypeColor(row.type)">{{ row.type }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="severity" label="严重等级" width="100">
@@ -79,7 +80,7 @@
     <el-dialog v-model="detailVisible" title="告警详情" width="600px">
       <el-descriptions v-if="selectedAlert" :column="1" border>
         <el-descriptions-item label="告警时间">{{ selectedAlert.timestamp }}</el-descriptions-item>
-        <el-descriptions-item label="攻击类型">{{ getAttackTypeLabel(selectedAlert.type) }}</el-descriptions-item>
+        <el-descriptions-item label="攻击类型">{{ selectedAlert.type }}</el-descriptions-item>
         <el-descriptions-item label="严重等级">{{ getSeverityLabel(selectedAlert.severity) }}</el-descriptions-item>
         <el-descriptions-item label="源MAC地址">{{ selectedAlert.sourceMac }}</el-descriptions-item>
         <el-descriptions-item label="目标MAC地址">{{ selectedAlert.targetMac }}</el-descriptions-item>
@@ -151,14 +152,9 @@ const getSeverityLabel = (severity) => {
 const getAttackTypeColor = (type) => {
   const map = {
     'Deauth攻击': 'danger', '钓鱼AP': 'danger', '暴力破解': 'warning',
-    '非法接入': 'danger', 'Flood泛洪': 'warning', '弱口令': 'info', 'KRACK风险': 'danger'
+    '非法接入': 'danger', 'Flood泛洪': 'warning', '弱口令': 'info', '弱加密协议': 'info', 'KRACK风险': 'danger'
   }
   return map[type] || 'info'
-}
-
-const getAttackTypeLabel = (type) => {
-  if (type === 'KRACK风险') return '弱加密协议'
-  return type
 }
 
 const showDetail = (alert) => {

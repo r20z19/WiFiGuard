@@ -5,13 +5,12 @@
         <div class="card-header">
           <span>设备黑名单管理</span>
           <div class="header-actions">
-            <el-tag :type="alertStore.isBlacklistEnabled ? 'danger' : 'info'" effect="light">
-              {{ alertStore.isBlacklistEnabled ? '已启用' : '未启用' }}
-            </el-tag>
             <el-switch
-              :model-value="alertStore.isBlacklistEnabled"
-              active-text="启用黑名单"
-              @change="handleModeToggle"
+              :model-value="alertStore.accessListMode === 'blacklist'"
+              @change="toggleBlacklistMode"
+              active-text="已启用"
+              inactive-text="未启用"
+              style="margin-right: 12px;"
             />
             <el-button type="danger" size="small" @click="showAddDialog">
               <el-icon><Plus /></el-icon>
@@ -31,13 +30,6 @@
           <p>黑名单中的设备将被标记为威胁设备，一旦检测到将立即触发安全告警。建议将已知的攻击设备或可疑设备加入黑名单。</p>
         </template>
       </el-alert>
-
-      <el-alert
-        :title="alertStore.isBlacklistEnabled ? '当前启用的是黑名单策略，白名单已自动停用。' : '白名单与黑名单只能启用一个，开启黑名单后将自动停用白名单。'"
-        :type="alertStore.isBlacklistEnabled ? 'error' : 'info'"
-        :closable="false"
-        style="margin-bottom: 20px;"
-      />
 
       <el-table :data="alertStore.blacklist" style="width: 100%" stripe>
         <el-table-column prop="mac" label="MAC地址" width="200">
@@ -94,15 +86,20 @@ onMounted(() => {
   alertStore.fetchBlacklist()
 })
 
+const toggleBlacklistMode = (enabled) => {
+  const prev = alertStore.accessListMode
+  alertStore.setAccessListMode(enabled ? 'blacklist' : '')
+  if (enabled) {
+    ElMessage.success(prev === 'whitelist' ? '已切换为黑名单模式' : '已启用黑名单模式')
+    return
+  }
+  ElMessage.info('已关闭名单控制')
+}
+
 const showAddDialog = () => {
   isEdit.value = false
   form.value = { mac: '', name: '', reason: '' }
   dialogVisible.value = true
-}
-
-const handleModeToggle = (enabled) => {
-  alertStore.toggleListMode('blacklist', enabled)
-  ElMessage.success(enabled ? '黑名单已启用，白名单已自动停用' : '黑名单已停用')
 }
 
 const editDevice = (device) => {
@@ -165,7 +162,6 @@ const removeDevice = (mac) => {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 .mac-address {

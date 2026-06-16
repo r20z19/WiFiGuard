@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref } from 'vue'
 import {
   getSystemStatus,
   getCurrentAlerts,
@@ -19,20 +19,14 @@ import {
 } from '../api/index'
 
 export const useAlertStore = defineStore('alert', () => {
-  const LIST_MODE_STORAGE_KEY = 'wifiguard-active-list-mode'
-  const getInitialListMode = () => {
-    if (typeof window === 'undefined') return ''
-    const savedMode = window.localStorage.getItem(LIST_MODE_STORAGE_KEY)
-    return savedMode === 'whitelist' || savedMode === 'blacklist' ? savedMode : ''
-  }
-
+  const ACCESS_LIST_MODE_STORAGE_KEY = 'wifiguard_access_list_mode'
   const systemStatus = ref({ status: 'initializing', uptime: 0, monitorInterface: '' })
   const currentAlerts = ref([])
   const historyAlerts = ref([])
   const onlineDevices = ref([])
   const whitelist = ref([])
   const blacklist = ref([])
-  const activeListMode = ref(getInitialListMode())
+  const accessListMode = ref(localStorage.getItem(ACCESS_LIST_MODE_STORAGE_KEY) || '')
   const emailConfig = ref({
     smtpHost: '',
     smtpPort: 465,
@@ -43,22 +37,6 @@ export const useAlertStore = defineStore('alert', () => {
   })
   const emailRecords = ref([])
   const loading = ref(false)
-  const isWhitelistEnabled = computed(() => activeListMode.value === 'whitelist')
-  const isBlacklistEnabled = computed(() => activeListMode.value === 'blacklist')
-  const activeListLabel = computed(() => {
-    if (activeListMode.value === 'whitelist') return '白名单'
-    if (activeListMode.value === 'blacklist') return '黑名单'
-    return '未启用'
-  })
-
-  watch(activeListMode, (mode) => {
-    if (typeof window === 'undefined') return
-    if (mode) {
-      window.localStorage.setItem(LIST_MODE_STORAGE_KEY, mode)
-    } else {
-      window.localStorage.removeItem(LIST_MODE_STORAGE_KEY)
-    }
-  })
 
   async function fetchSystemStatus() {
     try {
@@ -198,14 +176,14 @@ export const useAlertStore = defineStore('alert', () => {
     return await testEmailConnection(config)
   }
 
-  function toggleListMode(mode, enabled) {
-    if (enabled) {
-      activeListMode.value = mode
+  function setAccessListMode(mode) {
+    const next = mode === 'whitelist' || mode === 'blacklist' ? mode : ''
+    accessListMode.value = next
+    if (next) {
+      localStorage.setItem(ACCESS_LIST_MODE_STORAGE_KEY, next)
       return
     }
-    if (activeListMode.value === mode) {
-      activeListMode.value = ''
-    }
+    localStorage.removeItem(ACCESS_LIST_MODE_STORAGE_KEY)
   }
 
   return {
@@ -215,10 +193,7 @@ export const useAlertStore = defineStore('alert', () => {
     onlineDevices,
     whitelist,
     blacklist,
-    activeListMode,
-    isWhitelistEnabled,
-    isBlacklistEnabled,
-    activeListLabel,
+    accessListMode,
     emailConfig,
     emailRecords,
     loading,
@@ -236,8 +211,8 @@ export const useAlertStore = defineStore('alert', () => {
     removeFromWhitelist,
     addToBlacklist,
     removeFromBlacklist,
-    toggleListMode,
     updateEmailConfig,
-    testEmail
+    testEmail,
+    setAccessListMode
   }
 })

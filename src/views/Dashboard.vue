@@ -76,7 +76,7 @@
             <el-table-column label="操作" width="100">
               <template #default="{ row }">
                 <el-button type="primary" link @click="alertStore.clearAlert(row.id)">
-                  处理
+                  删除
                 </el-button>
               </template>
             </el-table-column>

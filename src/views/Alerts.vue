@@ -39,8 +39,8 @@
                 <p>{{ row.suggestion }}</p>
               </div>
             </el-popover>
-            <el-button type="success" link @click="handleClear(row.id)">
-              处理
+            <el-button type="danger" link @click="handleDelete(row.id)">
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -131,19 +131,20 @@ const getAttackTypeColor = (type) => {
     '非法接入': 'danger',
     'Flood泛洪': 'warning',
     '弱口令': 'info',
+    '弱加密协议': 'info',
     'KRACK风险': 'danger'
   }
   return map[type] || 'info'
 }
 
-const handleClear = (id) => {
-  ElMessageBox.confirm('确认已处理此告警？', '提示', {
+const handleDelete = (id) => {
+  ElMessageBox.confirm('确认删除此告警？', '提示', {
     confirmButtonText: '确认',
     cancelButtonText: '取消',
-    type: 'success'
+    type: 'warning'
   }).then(() => {
     alertStore.clearAlert(id)
-    ElMessage.success('告警已处理')
+    ElMessage.success('告警已删除')
   }).catch(() => {})
 }
 

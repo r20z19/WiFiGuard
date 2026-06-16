@@ -13,6 +13,9 @@
               style="width: 200px; margin-right: 10px;"
               prefix-icon="Search"
             />
+            <el-tag size="small" :type="accessModeTagType" style="margin-right: 10px;">
+              {{ accessModeText }}
+            </el-tag>
             <el-button type="primary" size="small" @click="refreshDevices">
               <el-icon><Refresh /></el-icon>
               刷新
@@ -53,7 +56,7 @@
               type="success"
               link
               @click="addToWhitelist(row)"
-              :disabled="isInWhitelist(row.mac)"
+              :disabled="!canUseWhitelist || isInWhitelist(row.mac) || isInBlacklist(row.mac)"
             >
               加入白名单
             </el-button>
@@ -61,7 +64,7 @@
               type="danger"
               link
               @click="addToBlacklist(row)"
-              :disabled="isInBlacklist(row.mac)"
+              :disabled="!canUseBlacklist || isInBlacklist(row.mac) || isInWhitelist(row.mac)"
             >
               加入黑名单
             </el-button>
@@ -107,6 +110,19 @@ import { ElMessage } from 'element-plus'
 
 const alertStore = useAlertStore()
 const searchQuery = ref('')
+
+const canUseWhitelist = computed(() => alertStore.accessListMode === 'whitelist')
+const canUseBlacklist = computed(() => alertStore.accessListMode === 'blacklist')
+const accessModeText = computed(() => {
+  if (alertStore.accessListMode === 'whitelist') return '名单控制：白名单'
+  if (alertStore.accessListMode === 'blacklist') return '名单控制：黑名单'
+  return '名单控制：未启用'
+})
+const accessModeTagType = computed(() => {
+  if (alertStore.accessListMode === 'whitelist') return 'success'
+  if (alertStore.accessListMode === 'blacklist') return 'danger'
+  return 'info'
+})
 
 const filteredDevices = computed(() => {
   if (!searchQuery.value) return alertStore.onlineDevices

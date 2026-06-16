@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useAlertStore = defineStore('alert', () => {
+  const ACCESS_LIST_MODE_STORAGE_KEY = 'wifiguard_access_list_mode'
   const currentAlerts = ref([
     {
       id: 1,
@@ -94,6 +95,7 @@ export const useAlertStore = defineStore('alert', () => {
     { mac: '11:22:33:44:55:01', name: '攻击设备', reason: '暴力破解攻击', addedAt: '2026-05-09 09:45:00' }
   ])
 
+  const accessListMode = ref(localStorage.getItem(ACCESS_LIST_MODE_STORAGE_KEY) || '')
   const emailConfig = ref({
     smtpHost: 'smtp.qq.com',
     smtpPort: 465,
@@ -136,12 +138,23 @@ export const useAlertStore = defineStore('alert', () => {
     emailConfig.value = { ...emailConfig.value, ...config }
   }
 
+  function setAccessListMode(mode) {
+    const next = mode === 'whitelist' || mode === 'blacklist' ? mode : ''
+    accessListMode.value = next
+    if (next) {
+      localStorage.setItem(ACCESS_LIST_MODE_STORAGE_KEY, next)
+      return
+    }
+    localStorage.removeItem(ACCESS_LIST_MODE_STORAGE_KEY)
+  }
+
   return {
     currentAlerts,
     historyAlerts,
     onlineDevices,
     whitelist,
     blacklist,
+    accessListMode,
     emailConfig,
     addAlert,
     clearAlert,
@@ -149,6 +162,7 @@ export const useAlertStore = defineStore('alert', () => {
     removeFromWhitelist,
     addToBlacklist,
     removeFromBlacklist,
-    updateEmailConfig
+    updateEmailConfig,
+    setAccessListMode
   }
 })

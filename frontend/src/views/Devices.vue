@@ -13,6 +13,9 @@
               style="width: 200px; margin-right: 10px;"
               prefix-icon="Search"
             />
+            <el-tag size="small" :type="accessModeTagType" style="margin-right: 10px;">
+              {{ accessModeText }}
+            </el-tag>
             <el-button type="primary" size="small" @click="refreshDevices">
               <el-icon><Refresh /></el-icon>
               刷新
@@ -20,21 +23,6 @@
           </div>
         </div>
       </template>
-
-      <div class="list-policy-bar">
-        <span class="policy-label">名单策略</span>
-        <el-switch
-          :model-value="alertStore.isWhitelistEnabled"
-          active-text="启用白名单"
-          @change="(enabled) => handleListModeToggle('whitelist', enabled)"
-        />
-        <el-switch
-          :model-value="alertStore.isBlacklistEnabled"
-          active-text="启用黑名单"
-          @change="(enabled) => handleListModeToggle('blacklist', enabled)"
-        />
-        <el-tag type="info" effect="light">当前：{{ alertStore.activeListLabel }}</el-tag>
-      </div>
 
       <el-table :data="filteredDevices" style="width: 100%" stripe>
         <el-table-column prop="mac" label="MAC地址" width="180">
@@ -68,7 +56,7 @@
               type="success"
               link
               @click="addToWhitelist(row)"
-              :disabled="!alertStore.isWhitelistEnabled || isInWhitelist(row.mac) || isInBlacklist(row.mac)"
+              :disabled="!canUseWhitelist || isInWhitelist(row.mac) || isInBlacklist(row.mac)"
             >
               加入白名单
             </el-button>
@@ -76,7 +64,7 @@
               type="danger"
               link
               @click="addToBlacklist(row)"
-              :disabled="!alertStore.isBlacklistEnabled || isInBlacklist(row.mac) || isInWhitelist(row.mac)"
+              :disabled="!canUseBlacklist || isInBlacklist(row.mac) || isInWhitelist(row.mac)"
             >
               加入黑名单
             </el-button>
@@ -123,6 +111,19 @@ import { ElMessage } from 'element-plus'
 const alertStore = useAlertStore()
 const searchQuery = ref('')
 
+const canUseWhitelist = computed(() => alertStore.accessListMode === 'whitelist')
+const canUseBlacklist = computed(() => alertStore.accessListMode === 'blacklist')
+const accessModeText = computed(() => {
+  if (alertStore.accessListMode === 'whitelist') return '名单控制：白名单'
+  if (alertStore.accessListMode === 'blacklist') return '名单控制：黑名单'
+  return '名单控制：未启用'
+})
+const accessModeTagType = computed(() => {
+  if (alertStore.accessListMode === 'whitelist') return 'success'
+  if (alertStore.accessListMode === 'blacklist') return 'danger'
+  return 'info'
+})
+
 onMounted(() => {
   alertStore.fetchOnlineDevices()
   alertStore.fetchWhitelist()
@@ -161,15 +162,6 @@ const isInWhitelist = (mac) => {
 
 const isInBlacklist = (mac) => {
   return alertStore.blacklist.some(d => d.mac === mac)
-}
-
-const handleListModeToggle = (mode, enabled) => {
-  alertStore.toggleListMode(mode, enabled)
-  if (!enabled) {
-    ElMessage.success(`${mode === 'whitelist' ? '白名单' : '黑名单'}已停用`)
-    return
-  }
-  ElMessage.success(`${mode === 'whitelist' ? '白名单' : '黑名单'}已启用，另一名单已自动停用`)
 }
 
 const addToWhitelist = async (device) => {
@@ -221,22 +213,6 @@ const refreshDevices = () => {
 .header-actions {
   display: flex;
   align-items: center;
-}
-
-.list-policy-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 8px;
-  flex-wrap: wrap;
-}
-
-.policy-label {
-  font-weight: 600;
-  color: #303133;
 }
 
 .mac-address {

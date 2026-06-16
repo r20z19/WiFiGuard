@@ -22,6 +22,7 @@
               <el-option label="非法接入" value="非法接入" />
               <el-option label="Flood泛洪" value="Flood泛洪" />
               <el-option label="弱口令" value="弱口令" />
+              <el-option label="弱加密协议" value="弱加密协议" />
               <el-option label="KRACK风险" value="KRACK风险" />
             </el-select>
             <el-select v-model="filterStatus" placeholder="处理状态" size="small" clearable style="width: 120px;">
@@ -132,7 +133,7 @@ const getSeverityLabel = (severity) => {
 const getAttackTypeColor = (type) => {
   const map = {
     'Deauth攻击': 'danger', '钓鱼AP': 'danger', '暴力破解': 'warning',
-    '非法接入': 'danger', 'Flood泛洪': 'warning', '弱口令': 'info', 'KRACK风险': 'danger'
+    '非法接入': 'danger', 'Flood泛洪': 'warning', '弱口令': 'info', '弱加密协议': 'info', 'KRACK风险': 'danger'
   }
   return map[type] || 'info'
 }
