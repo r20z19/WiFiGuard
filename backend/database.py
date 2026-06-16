@@ -44,7 +44,11 @@ CREATE TABLE IF NOT EXISTS devices_online (
     signal INTEGER,
     status TEXT DEFAULT '正常',
     first_seen TEXT NOT NULL,
-    last_seen TEXT NOT NULL
+    last_seen TEXT NOT NULL,
+    vendor TEXT DEFAULT '',
+    pairwise_cipher TEXT DEFAULT '',
+    group_cipher TEXT DEFAULT '',
+    akm TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS whitelist (
@@ -88,10 +92,23 @@ def get_db():
     return conn
 
 
+MIGRATIONS = [
+    "ALTER TABLE devices_online ADD COLUMN vendor TEXT DEFAULT ''",
+    "ALTER TABLE devices_online ADD COLUMN pairwise_cipher TEXT DEFAULT ''",
+    "ALTER TABLE devices_online ADD COLUMN group_cipher TEXT DEFAULT ''",
+    "ALTER TABLE devices_online ADD COLUMN akm TEXT DEFAULT ''",
+]
+
+
 def init_db():
     os.makedirs(os.path.dirname(DATABASE_PATH), exist_ok=True)
     conn = get_db()
     conn.executescript(SCHEMA)
+    for sql in MIGRATIONS:
+        try:
+            conn.execute(sql)
+        except sqlite3.OperationalError:
+            pass
     conn.execute(
         "INSERT OR IGNORE INTO email_config (id) VALUES (1)"
     )
@@ -103,8 +120,9 @@ def init_db():
 def _init_default_user(conn):
     exists = conn.execute("SELECT id FROM users WHERE username = ?", ("admin",)).fetchone()
     if not exists:
-        now = "datetime('now')"
-        password_hash = hashlib.sha256("123123".encode("utf-8")).hexdigest()
+        from services.auth_service import _hash_password
+
+        password_hash = _hash_password("123123")
         conn.execute(
             "INSERT INTO users (username, password_hash, is_first_login, created_at) VALUES (?, ?, 1, datetime('now'))",
             ("admin", password_hash),

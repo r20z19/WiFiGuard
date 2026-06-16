@@ -1,5 +1,6 @@
 <template>
-  <el-container class="app-container">
+  <router-view v-if="!authStore.isLoggedIn" />
+  <el-container v-else class="app-container">
     <el-header class="app-header">
       <div class="header-left">
         <el-icon class="logo-icon"><Monitor /></el-icon>

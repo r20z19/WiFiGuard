@@ -30,8 +30,20 @@
             <span class="mac-address">{{ row.mac }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="ip" label="IP地址" width="150" />
+        <el-table-column label="厂商" width="120">
+          <template #default="{ row }">
+            <span>{{ row.vendor || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="ip" label="IP地址" width="140" />
         <el-table-column prop="ssid" label="连接SSID" width="180" />
+        <el-table-column label="加密方式" width="160">
+          <template #default="{ row }">
+            <el-tag v-if="row.pairwiseCipher" type="info" size="small">
+              {{ row.pairwiseCipher }}{{ row.groupCipher && row.groupCipher !== row.pairwiseCipher ? '+' + row.groupCipher : '' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="signal" label="信号强度" width="120">
           <template #default="{ row }">
             <el-progress
@@ -134,7 +146,7 @@ const filteredDevices = computed(() => {
   if (!searchQuery.value) return alertStore.onlineDevices
   const query = searchQuery.value.toLowerCase()
   return alertStore.onlineDevices.filter(
-    d => d.mac.toLowerCase().includes(query) || d.ip.includes(query)
+    d => d.mac.toLowerCase().includes(query) || d.ip.includes(query) || (d.vendor || '').toLowerCase().includes(query)
   )
 })
 

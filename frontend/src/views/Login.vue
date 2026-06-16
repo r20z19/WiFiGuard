@@ -13,6 +13,8 @@
         <h1 class="app-title">WiFiGuard</h1>
         <p class="app-subtitle">智能无线入侵检测与预警系统</p>
       </div>
+
+      <!-- Login form -->
       <el-form
         ref="loginFormRef"
         :model="loginForm"
@@ -54,6 +56,7 @@
       </el-form>
     </div>
 
+    <!-- First-login password change dialog -->
     <el-dialog
       v-model="showChangePassword"
       title="修改默认密码"
@@ -96,7 +99,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button type="primary" @click="handleChangePassword">确认修改</el-button>
+        <el-button type="primary" :loading="changingPwd" @click="handleChangePassword">确认修改</el-button>
       </template>
     </el-dialog>
   </div>
@@ -108,10 +111,12 @@ import { useRouter } from 'vue-router'
 import { User, Lock, Monitor, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
+import { changePassword as apiChangePassword } from '../api/index'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const loading = ref(false)
+const changingPwd = ref(false)
 const loginFormRef = ref(null)
 const showChangePassword = ref(false)
 const changePwdFormRef = ref(null)
@@ -181,16 +186,26 @@ const handleChangePassword = async () => {
   if (!changePwdFormRef.value) return
   await changePwdFormRef.value.validate(async (valid) => {
     if (!valid) return
+    changingPwd.value = true
     try {
+      await apiChangePassword({
+        oldPassword: changePwdForm.oldPassword,
+        newPassword: changePwdForm.newPassword
+      })
       authStore.setUserInfo({
         username: loginForm.username,
         isFirstLogin: false
       })
       showChangePassword.value = false
       ElMessage.success('密码修改成功')
+      changePwdForm.oldPassword = ''
+      changePwdForm.newPassword = ''
+      changePwdForm.confirmPassword = ''
       router.push('/')
     } catch (e) {
-      ElMessage.error('密码修改失败')
+      ElMessage.error('密码修改失败，请检查旧密码是否正确')
+    } finally {
+      changingPwd.value = false
     }
   })
 }
