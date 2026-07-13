@@ -56,18 +56,6 @@
         </el-form-item>
       </el-form>
 
-      <!-- First-login forced password change (no login form visible) -->
-      <div v-if="showChangePassword && !tokenExists" class="login-form">
-        <el-button
-          type="primary"
-          size="large"
-          class="login-button"
-          :loading="loading"
-          @click="handleLogin"
-        >
-          {{ loading ? '登录中...' : '登 录' }}
-        </el-button>
-      </div>
     </div>
 
     <!-- First-login password change dialog -->
@@ -122,12 +110,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { User, Lock, Monitor, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
-import { changePassword as apiChangePassword, verifyLogin as apiVerifyLogin } from '../api/index'
+import { changePassword as apiChangePassword } from '../api/index'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -136,7 +124,6 @@ const changingPwd = ref(false)
 const loginFormRef = ref(null)
 const showChangePassword = ref(false)
 const changePwdFormRef = ref(null)
-const tokenExists = ref(false)
 
 const loginForm = reactive({
   username: '',
@@ -174,29 +161,6 @@ const changePwdRules = {
   ]
 }
 
-// Auto-detect first-login state on mount: if user has a valid token
-// but hasn't changed the default password, show the change dialog directly
-onMounted(async () => {
-  const token = localStorage.getItem('token')
-  const isFirstLogin = localStorage.getItem('isFirstLogin') !== 'false'
-  if (token && isFirstLogin) {
-    tokenExists.value = true
-    // Verify the token is still valid
-    try {
-      const result = await apiVerifyLogin()
-      if (result.valid && result.isFirstLogin) {
-        showChangePassword.value = true
-      } else if (result.valid && !result.isFirstLogin) {
-        // Password already changed, redirect to dashboard
-        router.push('/')
-      }
-    } catch (e) {
-      // Token invalid, let user log in again
-      authStore.logout()
-      tokenExists.value = false
-    }
-  }
-})
 
 const handleLogin = async () => {
   if (!loginFormRef.value) return
