@@ -47,8 +47,8 @@ def change_password():
     if not data:
         return jsonify({"message": "请求数据为空"}), 400
 
-    old_password = data.get("oldPassword", "")
-    new_password = data.get("newPassword", "")
+    old_password = data.get("oldPassword", "").strip()
+    new_password = data.get("newPassword", "").strip()
 
     if not old_password or not new_password:
         return jsonify({"message": "旧密码和新密码不能为空"}), 400

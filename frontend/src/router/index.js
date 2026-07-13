@@ -58,13 +58,27 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
+  const isFirstLogin = localStorage.getItem('isFirstLogin') !== 'false'
+
+  // Protected route without token → force login
   if (to.meta.requiresAuth && !token) {
     next('/login')
-  } else if (to.path === '/login' && token) {
-    next('/')
-  } else {
-    next()
+    return
   }
+
+  // Protected route with token but password not yet changed → force password change
+  if (to.meta.requiresAuth && token && isFirstLogin) {
+    next('/login')
+    return
+  }
+
+  // Already on login page with valid token and password changed → skip login
+  if (to.path === '/login' && token && !isFirstLogin) {
+    next('/')
+    return
+  }
+
+  next()
 })
 
 export default router

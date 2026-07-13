@@ -92,6 +92,30 @@ def verify_user_token(token):
     }
 
 
+def require_auth(token, require_password_changed=True):
+    """Validate JWT token and optionally enforce password-change requirement.
+
+    Returns (payload, error_message).  error is None on success.
+    """
+    if not token:
+        return None, "未授权，请先登录"
+    payload = verify_token(token)
+    if not payload:
+        return None, "令牌无效或已过期"
+
+    if require_password_changed:
+        conn = get_db()
+        user = conn.execute(
+            "SELECT is_first_login FROM users WHERE id = ?",
+            (payload["user_id"],),
+        ).fetchone()
+        conn.close()
+        if user and user["is_first_login"]:
+            return payload, "首次登录，请先修改默认密码"
+
+    return payload, None
+
+
 def change_user_password(token, old_password, new_password):
     payload = verify_token(token)
     if not payload:

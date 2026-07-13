@@ -72,7 +72,7 @@ def clear_alert(alert_id):
 
     conn.execute(
         """INSERT INTO alerts_history (id, type, severity, source_mac, target_mac, timestamp, suggestion, status, cleared_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, '已处理', ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, '已删除', ?)""",
         (
             alert["id"],
             alert["type"],

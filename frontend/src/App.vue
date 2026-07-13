@@ -1,5 +1,5 @@
 <template>
-  <router-view v-if="!authStore.isLoggedIn" />
+  <router-view v-if="!authStore.isLoggedIn || authStore.isFirstLogin" />
   <el-container v-else class="app-container">
     <el-header class="app-header">
       <div class="header-left">
@@ -53,10 +53,12 @@
           <el-menu-item index="/whitelist">
             <el-icon><Check /></el-icon>
             <span>设备白名单</span>
+            <el-tag v-if="alertStore.accessListMode === 'whitelist'" size="small" type="success" class="mode-tag">已启用</el-tag>
           </el-menu-item>
           <el-menu-item index="/blacklist">
             <el-icon><Close /></el-icon>
             <span>设备黑名单</span>
+            <el-tag v-if="alertStore.accessListMode === 'blacklist'" size="small" type="danger" class="mode-tag">已启用</el-tag>
           </el-menu-item>
           <el-menu-item index="/email">
             <el-icon><Message /></el-icon>
@@ -305,6 +307,11 @@ const handleUpdatePassword = async () => {
 .side-menu {
   border-right: none;
   height: 100%;
+}
+
+.mode-tag {
+  margin-left: auto;
+  margin-right: 8px;
 }
 
 .app-main {

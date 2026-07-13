@@ -32,6 +32,7 @@ class DetectionEngine:
         from detection.brute_force import BruteForceDetector
         from detection.illegal_access import IllegalAccessDetector
         from detection.weak_password import WeakPasswordDetector
+        from detection.weak_encryption import WeakEncryptionDetector
         from detection.krack import KrackDetector
 
         self._detectors = [
@@ -41,6 +42,7 @@ class DetectionEngine:
             BruteForceDetector(),
             IllegalAccessDetector(),
             WeakPasswordDetector(),
+            WeakEncryptionDetector(),
             KrackDetector(),
         ]
 

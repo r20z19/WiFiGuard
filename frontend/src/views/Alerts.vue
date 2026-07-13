@@ -78,7 +78,7 @@
               <el-descriptions-item label="告警时间">{{ alert.timestamp }}</el-descriptions-item>
             </el-descriptions>
             <el-alert
-              title="处理建议"
+              title="安全建议"
               type="info"
               :closable="false"
               style="margin-top: 15px;"

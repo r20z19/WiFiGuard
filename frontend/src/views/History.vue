@@ -25,9 +25,9 @@
               <el-option label="弱加密协议" value="弱加密协议" />
               <el-option label="KRACK风险" value="KRACK风险" />
             </el-select>
-            <el-select v-model="filterStatus" placeholder="处理状态" size="small" clearable style="width: 120px;">
+            <el-select v-model="filterStatus" placeholder="状态" size="small" clearable style="width: 120px;">
               <el-option label="全部" value="" />
-              <el-option label="已处理" value="已处理" />
+              <el-option label="已删除" value="已删除" />
               <el-option label="已忽略" value="已忽略" />
             </el-select>
           </div>
@@ -50,9 +50,9 @@
         </el-table-column>
         <el-table-column prop="sourceMac" label="源MAC地址" width="180" />
         <el-table-column prop="targetMac" label="目标MAC地址" width="180" />
-        <el-table-column prop="status" label="处理状态" width="100">
+        <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === '已处理' ? 'success' : 'info'" size="small">
+            <el-tag :type="row.status === '已删除' ? 'danger' : 'info'" size="small">
               {{ row.status }}
             </el-tag>
           </template>
@@ -84,7 +84,7 @@
         <el-descriptions-item label="严重等级">{{ getSeverityLabel(selectedAlert.severity) }}</el-descriptions-item>
         <el-descriptions-item label="源MAC地址">{{ selectedAlert.sourceMac }}</el-descriptions-item>
         <el-descriptions-item label="目标MAC地址">{{ selectedAlert.targetMac }}</el-descriptions-item>
-        <el-descriptions-item label="处理状态">{{ selectedAlert.status }}</el-descriptions-item>
+        <el-descriptions-item label="状态">{{ selectedAlert.status }}</el-descriptions-item>
         <el-descriptions-item label="安全建议" v-if="selectedAlert.suggestion">
           {{ selectedAlert.suggestion }}
         </el-descriptions-item>

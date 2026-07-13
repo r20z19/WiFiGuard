@@ -14,8 +14,15 @@
         <p class="app-subtitle">智能无线入侵检测与预警系统</p>
       </div>
 
-      <!-- Login form -->
+      <!-- Default credential notice -->
+      <div class="default-credential-notice">
+        <el-icon class="notice-icon"><InfoFilled /></el-icon>
+        <span>默认账号：admin / admin，首次登录后必须修改密码</span>
+      </div>
+
+      <!-- Login form (hidden when first-login dialog is shown) -->
       <el-form
+        v-if="!showChangePassword"
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
@@ -54,6 +61,19 @@
           </el-button>
         </el-form-item>
       </el-form>
+
+      <!-- First-login forced password change (no login form visible) -->
+      <div v-if="showChangePassword && !tokenExists" class="login-form">
+        <el-button
+          type="primary"
+          size="large"
+          class="login-button"
+          :loading="loading"
+          @click="handleLogin"
+        >
+          {{ loading ? '登录中...' : '登 录' }}
+        </el-button>
+      </div>
     </div>
 
     <!-- First-login password change dialog -->
@@ -62,10 +82,12 @@
       title="修改默认密码"
       width="400px"
       :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
     >
       <div class="password-change-tip">
         <el-icon class="tip-icon"><WarningFilled /></el-icon>
-        <span>首次登录，请修改默认密码</span>
+        <span>首次登录，必须修改默认密码后才能使用系统</span>
       </div>
       <el-form
         ref="changePwdFormRef"
@@ -106,12 +128,12 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock, Monitor, WarningFilled } from '@element-plus/icons-vue'
+import { User, Lock, Monitor, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
-import { changePassword as apiChangePassword } from '../api/index'
+import { changePassword as apiChangePassword, verifyLogin as apiVerifyLogin } from '../api/index'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -120,6 +142,7 @@ const changingPwd = ref(false)
 const loginFormRef = ref(null)
 const showChangePassword = ref(false)
 const changePwdFormRef = ref(null)
+const tokenExists = ref(false)
 
 const loginForm = reactive({
   username: '',
@@ -157,6 +180,30 @@ const changePwdRules = {
   ]
 }
 
+// Auto-detect first-login state on mount: if user has a valid token
+// but hasn't changed the default password, show the change dialog directly
+onMounted(async () => {
+  const token = localStorage.getItem('token')
+  const isFirstLogin = localStorage.getItem('isFirstLogin') !== 'false'
+  if (token && isFirstLogin) {
+    tokenExists.value = true
+    // Verify the token is still valid
+    try {
+      const result = await apiVerifyLogin()
+      if (result.valid && result.isFirstLogin) {
+        showChangePassword.value = true
+      } else if (result.valid && !result.isFirstLogin) {
+        // Password already changed, redirect to dashboard
+        router.push('/')
+      }
+    } catch (e) {
+      // Token invalid, let user log in again
+      authStore.logout()
+      tokenExists.value = false
+    }
+  }
+})
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   await loginFormRef.value.validate(async (valid) => {
@@ -193,7 +240,7 @@ const handleChangePassword = async () => {
         newPassword: changePwdForm.newPassword
       })
       authStore.setUserInfo({
-        username: loginForm.username,
+        username: loginForm.username || authStore.userInfo.username || 'admin',
         isFirstLogin: false
       })
       showChangePassword.value = false
@@ -283,7 +330,7 @@ const handleChangePassword = async () => {
 
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .logo-wrapper {
@@ -316,8 +363,27 @@ const handleChangePassword = async () => {
   color: #666;
 }
 
+.default-credential-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #ecf5ff;
+  border: 1px solid #b3d8ff;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  color: #409eff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.notice-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
 .login-form {
-  margin-top: 30px;
+  margin-top: 20px;
 }
 
 .login-form :deep(.el-input__wrapper) {
