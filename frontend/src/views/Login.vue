@@ -14,12 +14,6 @@
         <p class="app-subtitle">智能无线入侵检测与预警系统</p>
       </div>
 
-      <!-- Default credential notice -->
-      <div class="default-credential-notice">
-        <el-icon class="notice-icon"><InfoFilled /></el-icon>
-        <span>默认账号：admin / admin，首次登录后必须修改密码</span>
-      </div>
-
       <!-- Login form (hidden when first-login dialog is shown) -->
       <el-form
         v-if="!showChangePassword"
@@ -130,7 +124,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock, Monitor, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
+import { User, Lock, Monitor, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../store/auth'
 import { changePassword as apiChangePassword, verifyLogin as apiVerifyLogin } from '../api/index'
@@ -361,25 +355,6 @@ const handleChangePassword = async () => {
   margin: 0;
   font-size: 14px;
   color: #666;
-}
-
-.default-credential-notice {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #ecf5ff;
-  border: 1px solid #b3d8ff;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  color: #409eff;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.notice-icon {
-  font-size: 16px;
-  flex-shrink: 0;
 }
 
 .login-form {

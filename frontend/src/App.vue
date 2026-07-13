@@ -136,6 +136,7 @@ const alertCount = computed(() => alertStore.currentAlerts.length)
 let pollTimer = null
 
 onMounted(() => {
+  if (!authStore.isLoggedIn || authStore.isFirstLogin) return
   alertStore.fetchSystemStatus()
   alertStore.fetchCurrentAlerts()
   alertStore.fetchOnlineDevices()
