@@ -37,8 +37,13 @@ class IllegalAccessDetector(BaseDetector):
                 continue
             sa = f.get("sa", "")
             da = f.get("da", "")
+            bssid = f.get("bssid", "")
 
-            # Skip frames from known devices and APs
+            # Skip frame if not directed at a known AP
+            target = da or bssid or ""
+            if self._ap_macs and target not in self._ap_macs:
+                continue
+
             if not sa or sa in self._known_macs or sa in self._ap_macs:
                 continue
 

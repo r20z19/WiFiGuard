@@ -6,9 +6,8 @@ class WeakPasswordDetector(BaseDetector):
     name = "弱口令"
     severity = "low"
     suggestion = (
-        "当前WiFi密码强度可能存在风险。检测到网络使用不安全的加密配置，"
-        "攻击者可捕获WPA握手包后进行离线字典攻击。建议使用包含大小写字母、"
-        "数字和特殊字符的至少12位密码，并升级至WPA3-SAE。"
+        "当前WiFi密码强度可能存在风险。攻击者可捕获WPA握手包后进行离线字典攻击。"
+        "建议使用包含大小写字母、数字和特殊字符的至少12位密码，并避免使用默认SSID和默认密码。"
     )
 
     # Common weak SSID patterns that suggest default/weak configuration
@@ -23,9 +22,6 @@ class WeakPasswordDetector(BaseDetector):
         "admin", "default", "linksys", "Linksys",
     ]
 
-    # Weak security: WEP or WPA1 (TKIP)
-    WEAK_ENCRYPTIONS = ["WEP", "WPA", "WPA2-TKIP"]
-
     def __init__(self):
         self._beacon_checked = False
 
@@ -34,24 +30,6 @@ class WeakPasswordDetector(BaseDetector):
             return None
 
         for f in frames:
-            info = f.get("info", "")
-
-            # Check for WEP/WPA1 in beacon/probe response info
-            if "WEP" in info or "WPA Version" in info:
-                self._beacon_checked = True
-                return {
-                    "type": self.name,
-                    "severity": self.severity,
-                    "sourceMac": f.get("sa", "N/A"),
-                    "targetMac": "N/A",
-                    "timestamp": now_str(),
-                    "suggestion": (
-                        "检测到网络使用不安全的加密协议。"
-                        + self.suggestion
-                    ),
-                }
-
-            # Check SSID for weak/default patterns
             ssid = f.get("ssid", "")
             if ssid:
                 for pattern in self.WEAK_SSID_PATTERNS:

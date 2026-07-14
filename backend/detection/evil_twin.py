@@ -10,6 +10,14 @@ def _oui(mac):
     return mac[:8] if len(mac) >= 8 else ""
 
 
+def _is_local_admin_mac(mac):
+    try:
+        first_octet = int(mac.split(":")[0], 16)
+    except (ValueError, IndexError):
+        return False
+    return bool(first_octet & 0x02)
+
+
 class EvilTwinDetector(BaseDetector):
     name = "钓鱼AP"
     severity = "critical"
@@ -26,9 +34,13 @@ class EvilTwinDetector(BaseDetector):
         self._alerted_ssids = set()
         self._beacon_count = defaultdict(int)
         self._beacon_rate_alerted = set()
+        self._target_bssids = set()
         self._tick_count = 0
         self._beacon_reset_ticks = 5
         self._beacon_threshold = DETECTION_INTERVAL * 13 * self._beacon_reset_ticks
+
+    def set_target_bssids(self, bssids):
+        self._target_bssids = {b.lower() for b in bssids if b}
 
     def analyze(self, frames):
         for f in frames:
@@ -71,6 +83,11 @@ class EvilTwinDetector(BaseDetector):
                     "pairwiseCipher": f.get("pairwiseCipher", ""),
                     "groupCipher": f.get("groupCipher", ""),
                     "akm": f.get("akm", ""),
+                    "channel": f.get("channel", ""),
+                    "frequency": f.get("frequency", ""),
+                    "signal": f.get("signal"),
+                    "pmfCapable": f.get("pmfCapable", ""),
+                    "pmfRequired": f.get("pmfRequired", ""),
                 }
 
             if ssid_key not in self._ssid_ref_bssid:
@@ -78,7 +95,7 @@ class EvilTwinDetector(BaseDetector):
 
             bssids = self._ssid_bssids[ssid_key]
             if len(bssids) >= 2 and ssid_key not in self._alerted_ssids:
-                ref_bssid = self._ssid_ref_bssid[ssid_key]
+                ref_bssid = self._choose_reference_bssid(ssid_key, bssids)
                 reasons = []
 
                 for other in bssids:
@@ -91,6 +108,9 @@ class EvilTwinDetector(BaseDetector):
                     other_oui = _oui(other)
                     if ref_oui and other_oui and ref_oui != other_oui:
                         reasons.append("供应商OUI不匹配 ({} vs {})".format(other_oui, ref_oui))
+
+                    if _is_local_admin_mac(other) and other not in self._target_bssids:
+                        reasons.append("{} 使用本地管理MAC，疑似伪造BSSID".format(other))
 
                     pc_ref = ref_info.get("pairwiseCipher", "")
                     pc_other = other_info.get("pairwiseCipher", "")
@@ -106,6 +126,24 @@ class EvilTwinDetector(BaseDetector):
                     akm_other = other_info.get("akm", "")
                     if akm_ref and akm_other and akm_ref != akm_other:
                         reasons.append("认证方式不匹配 ({} vs {})".format(akm_other, akm_ref))
+
+                    pmf_ref = ref_info.get("pmfRequired", "") or ref_info.get("pmfCapable", "")
+                    pmf_other = other_info.get("pmfRequired", "") or other_info.get("pmfCapable", "")
+                    if pmf_ref and pmf_other and pmf_ref != pmf_other:
+                        reasons.append("PMF配置不匹配 ({} vs {})".format(pmf_other, pmf_ref))
+
+                    channel_ref = ref_info.get("channel", "")
+                    channel_other = other_info.get("channel", "")
+                    if channel_ref and channel_other and channel_ref != channel_other:
+                        reasons.append("信道不匹配 ({} vs {})".format(channel_other, channel_ref))
+
+                    sig_ref = ref_info.get("signal")
+                    sig_other = other_info.get("signal")
+                    if sig_ref is not None and sig_other is not None and abs(sig_ref - sig_other) >= 25:
+                        reasons.append("信号强度差异异常 ({}dBm vs {}dBm)".format(sig_other, sig_ref))
+
+                    if self._target_bssids and other not in self._target_bssids:
+                        reasons.append("{} 不在合法BSSID集合中".format(other))
 
                 self._alerted_ssids.add(ssid_key)
                 bssid_list = ", ".join(sorted(bssids))
@@ -124,6 +162,12 @@ class EvilTwinDetector(BaseDetector):
                 }
 
         return None
+
+    def _choose_reference_bssid(self, ssid_key, bssids):
+        for bssid in bssids:
+            if bssid in self._target_bssids:
+                return bssid
+        return self._ssid_ref_bssid[ssid_key]
 
     def _check_beacon_rate_anomaly(self):
         for bssid, count in list(self._beacon_count.items()):
@@ -151,4 +195,5 @@ class EvilTwinDetector(BaseDetector):
         self._alerted_ssids.clear()
         self._beacon_count.clear()
         self._beacon_rate_alerted.clear()
+        self._target_bssids.clear()
         self._tick_count = 0

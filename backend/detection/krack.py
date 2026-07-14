@@ -1,4 +1,5 @@
 from detection.base import BaseDetector
+from detection.packet_reader import FC_BEACON, FC_PROBE_RESP
 from utils.time_utils import now_str
 
 
@@ -12,9 +13,11 @@ class KrackDetector(BaseDetector):
         "同时确保所有客户端设备已安装最新的安全补丁。"
     )
 
-    # Vulnerable cipher suites
-    CIPHER_TKIP = "TKIP"
-    CIPHER_WEP = "WEP"
+    # Vulnerable cipher suite type codes from wlan.rsn.*.type
+    TKIP_TYPE = "2"
+    WEP40_TYPE = "1"
+    WEP104_TYPE = "5"
+    WEAK_TYPES = {"1": "WEP", "2": "TKIP", "5": "WEP"}
 
     def __init__(self):
         self._checked = False
@@ -24,51 +27,44 @@ class KrackDetector(BaseDetector):
             return None
 
         for f in frames:
+            if f["frameType"] not in (FC_BEACON, FC_PROBE_RESP):
+                continue
+
+            pairwise = str(f.get("pairwiseCipher", ""))
+            group = str(f.get("groupCipher", ""))
             info = f.get("info", "")
+            bssid = f.get("bssid", "") or f.get("sa", "N/A")
+            ssid = f.get("ssid", "")
 
-            # Check info field for vulnerable encryption indicators
+            # Check numeric cipher type fields (more reliable than info string)
+            for field_name, value in [("成对加密", pairwise), ("组播加密", group)]:
+                if value in self.WEAK_TYPES:
+                    weak_name = self.WEAK_TYPES[value]
+                    self._checked = True
+                    return {
+                        "type": self.name,
+                        "severity": self.severity,
+                        "sourceMac": bssid,
+                        "targetMac": "N/A",
+                        "timestamp": now_str(),
+                        "suggestion": (
+                            "SSID '{}' {}使用{}，该协议存在KRACK漏洞风险。{}"
+                        ).format(ssid or "隐藏SSID", field_name, weak_name, self.suggestion),
+                    }
+
+            # WPA1 detection (vendor IE with "WPA" tag but without RSN)
             upper_info = info.upper()
-            if self.CIPHER_TKIP in upper_info:
+            if ("WPA" in upper_info) and "RSN" not in info and "TKIP" in upper_info:
                 self._checked = True
                 return {
                     "type": self.name,
-                    "severity": self.severity,
-                    "sourceMac": f.get("sa", "N/A"),
+                    "severity": "critical",
+                    "sourceMac": bssid,
                     "targetMac": "N/A",
                     "timestamp": now_str(),
                     "suggestion": (
-                        "检测到网络使用TKIP加密，存在KRACK漏洞风险。"
-                        + self.suggestion
-                    ),
-                }
-
-            if self.CIPHER_WEP in upper_info:
-                self._checked = True
-                return {
-                    "type": self.name,
-                    "severity": self.severity,
-                    "sourceMac": f.get("sa", "N/A"),
-                    "targetMac": "N/A",
-                    "timestamp": now_str(),
-                    "suggestion": (
-                        "检测到网络使用WEP加密，WEP已被完全破解且易受多种攻击。"
-                        + self.suggestion
-                    ),
-                }
-
-            # Check for WPA version 1
-            if "WPA Version" in info or "WPA version" in info:
-                self._checked = True
-                return {
-                    "type": self.name,
-                    "severity": self.severity,
-                    "sourceMac": f.get("sa", "N/A"),
-                    "targetMac": "N/A",
-                    "timestamp": now_str(),
-                    "suggestion": (
-                        "检测到网络使用WPA1，存在已知安全漏洞。"
-                        + self.suggestion
-                    ),
+                        "SSID '{}' 使用WPA1-TKIP，存在KRACK和其他已知安全漏洞。"
+                    ).format(ssid or "隐藏SSID") + self.suggestion,
                 }
 
         return None

@@ -16,7 +16,28 @@ TSHARK_FIELDS = [
     "_ws.col.Info",
     "arp.src.proto_ipv4",
     "ip.src",
+    "wlan.rsn.gcs.type",
+    "wlan.rsn.pcs.type",
+    "wlan.rsn.akms.type",
+    "wlan.rsn.capabilities.mfpc",
+    "wlan.rsn.capabilities.mfpr",
+    "wlan.fixed.capabilities.privacy",
+    "wlan_radio.channel",
+    "wlan_radio.frequency",
 ]
+
+
+def _decode_ssid(value):
+    if not value:
+        return ""
+    if re.fullmatch(r"(?:[0-9a-fA-F]{2})+", value):
+        try:
+            decoded = bytes.fromhex(value).decode("utf-8")
+        except UnicodeDecodeError:
+            return value
+        if decoded.isprintable():
+            return decoded
+    return value
 
 
 def _parse_tshark_line(line):
@@ -32,7 +53,7 @@ def _parse_tshark_line(line):
     sa = raw.get("wlan.sa", "")
     da = raw.get("wlan.da", "")
     bssid = raw.get("wlan.bssid", "")
-    ssid = raw.get("wlan.ssid", "")
+    ssid = _decode_ssid(raw.get("wlan.ssid", ""))
     timestamp = raw.get("frame.time", "")
     signal = raw.get("radiotap.dbm_antsignal", "")
     info = raw.get("_ws.col.Info", "")
@@ -47,16 +68,21 @@ def _parse_tshark_line(line):
 
     return {
         "frameType": fc_int,
-        "sa": sa,
-        "da": da,
-        "bssid": bssid,
+        "sa": sa.lower(),
+        "da": da.lower(),
+        "bssid": bssid.lower(),
         "ssid": ssid,
         "timestamp": timestamp,
         "signal": int(signal) if signal else None,
         "info": info,
-        "pairwiseCipher": raw.get("wlan.rsn.pairwise_cipher", ""),
-        "groupCipher": raw.get("wlan.rsn.group_cipher", ""),
-        "akm": raw.get("wlan.rsn.akm", ""),
+        "pairwiseCipher": raw.get("wlan.rsn.pcs.type", ""),
+        "groupCipher": raw.get("wlan.rsn.gcs.type", ""),
+        "akm": raw.get("wlan.rsn.akms.type", ""),
+        "pmfCapable": raw.get("wlan.rsn.capabilities.mfpc", ""),
+        "pmfRequired": raw.get("wlan.rsn.capabilities.mfpr", ""),
+        "privacy": raw.get("wlan.fixed.capabilities.privacy", ""),
+        "channel": raw.get("wlan_radio.channel", ""),
+        "frequency": raw.get("wlan_radio.frequency", ""),
         "tagInterpretation": raw.get("wlan.tag.interpretation", ""),
         "ip": arp_ip if arp_ip else ip_src,
     }
@@ -272,7 +298,7 @@ class LivePacketCapture:
                 frame = _parse_tshark_line(line)
                 if frame:
                     self._queue.put(frame)
-                    print('*', end='', flush=True)
+                    print("*", end="", flush=True)
             if self._running:
                 print("[!] tshark 进程已退出，检查上方的 [tshark] 错误信息")
         except Exception as e:

@@ -62,8 +62,58 @@ def upsert_device(device):
 
 
 def bulk_upsert(devices):
-    for d in devices:
-        upsert_device(d)
+    if not devices:
+        return
+
+    conn = get_db()
+    try:
+        for device in devices:
+            existing = conn.execute(
+                "SELECT * FROM devices_online WHERE mac = ?", (device["mac"],)
+            ).fetchone()
+
+            if existing:
+                conn.execute(
+                    """UPDATE devices_online
+                       SET ip = ?, ssid = ?, signal = ?, status = ?, last_seen = ?,
+                           vendor = ?, pairwise_cipher = ?, group_cipher = ?, akm = ?
+                       WHERE mac = ?""",
+                    (
+                        device.get("ip") or existing["ip"],
+                        device.get("ssid") or existing["ssid"],
+                        device.get("signal", existing["signal"]),
+                        device.get("status") or existing["status"],
+                        device.get("last_seen", now_str()),
+                        device.get("vendor") or existing["vendor"],
+                        device.get("pairwiseCipher") or existing["pairwise_cipher"],
+                        device.get("groupCipher") or existing["group_cipher"],
+                        device.get("akm") or existing["akm"],
+                        device["mac"],
+                    ),
+                )
+            else:
+                conn.execute(
+                    """INSERT INTO devices_online
+                       (mac, ip, ssid, signal, status, first_seen, last_seen,
+                        vendor, pairwise_cipher, group_cipher, akm)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        device["mac"],
+                        device.get("ip", ""),
+                        device.get("ssid", ""),
+                        device.get("signal", -70),
+                        device.get("status", "正常"),
+                        device.get("first_seen", now_str()),
+                        device.get("last_seen", now_str()),
+                        device.get("vendor", ""),
+                        device.get("pairwiseCipher", ""),
+                        device.get("groupCipher", ""),
+                        device.get("akm", ""),
+                    ),
+                )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def remove_stale_devices(threshold_seconds=120):

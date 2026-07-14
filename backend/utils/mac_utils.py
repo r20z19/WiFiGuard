@@ -9,3 +9,11 @@ def is_valid_mac(mac):
 
 def normalize_mac(mac):
     return mac.upper().replace("-", ":")
+
+
+def is_multicast_mac(mac):
+    try:
+        first = int(mac.strip().split(":")[0], 16)
+    except (ValueError, IndexError):
+        return True
+    return bool(first & 0x01)

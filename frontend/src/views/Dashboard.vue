@@ -62,7 +62,7 @@
             </div>
           </template>
 
-          <el-table :data="alertStore.currentAlerts.slice(0, 5)" style="width: 100%">
+          <el-table :data="alertStore.currentAlerts.slice(0, 20)" style="width: 100%">
             <el-table-column prop="type" label="攻击类型" width="120" />
             <el-table-column prop="severity" label="严重等级" width="100">
               <template #default="{ row }">
@@ -118,7 +118,7 @@
             </div>
           </template>
 
-          <div v-for="device in alertStore.onlineDevices.slice(0, 5)" :key="device.mac" class="device-item">
+          <div v-for="device in alertStore.onlineDevices.slice(0, 20)" :key="device.mac" class="device-item">
             <div class="device-info">
               <div class="device-mac">{{ device.mac }}</div>
               <div class="device-ip">{{ device.ip }}</div>
