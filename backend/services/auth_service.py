@@ -24,10 +24,17 @@ def _verify_password(password, stored_hash):
             _, _, iterations, salt_hex, hash_hex = parts
             salt = bytes.fromhex(salt_hex)
             dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iterations))
-            return dk.hex() == hash_hex
+            result = dk.hex() == hash_hex
+            if not result:
+                print(f"[Auth] _verify_password FAILED: input='{password}', expected_hash={hash_hex[:16]}..., computed_hash={dk.hex()[:16]}...")
+            return result
+        print(f"[Auth] _verify_password: unexpected split len={len(parts)}")
         return False
     # Legacy SHA-256 (no salt) — backward compatible
-    return hashlib.sha256(password.encode("utf-8")).hexdigest() == stored_hash
+    result = hashlib.sha256(password.encode("utf-8")).hexdigest() == stored_hash
+    if not result:
+        print(f"[Auth] _verify_password (legacy) FAILED: input='{password}'")
+    return result
 
 
 def _generate_token(user_id, username):
@@ -58,9 +65,13 @@ def authenticate_user(username, password):
     conn.close()
 
     if not user:
+        print(f"[Auth] authenticate_user: user '{username}' not found")
         return None
 
-    if not _verify_password(password, user["password_hash"]):
+    verify_result = _verify_password(password, user["password_hash"])
+    print(f"[Auth] authenticate_user: user='{username}', hash_prefix={user['password_hash'][:30]}..., verify={verify_result}")
+
+    if not verify_result:
         return None
 
     token = _generate_token(user["id"], user["username"])
@@ -92,9 +103,34 @@ def verify_user_token(token):
     }
 
 
+def require_auth(token, require_password_changed=True):
+    """Validate JWT token and optionally enforce password-change requirement.
+
+    Returns (payload, error_message).  error is None on success.
+    """
+    if not token:
+        return None, "未授权，请先登录"
+    payload = verify_token(token)
+    if not payload:
+        return None, "令牌无效或已过期"
+
+    if require_password_changed:
+        conn = get_db()
+        user = conn.execute(
+            "SELECT is_first_login FROM users WHERE id = ?",
+            (payload["user_id"],),
+        ).fetchone()
+        conn.close()
+        if user and user["is_first_login"]:
+            return payload, "首次登录，请先修改默认密码"
+
+    return payload, None
+
+
 def change_user_password(token, old_password, new_password):
     payload = verify_token(token)
     if not payload:
+        print("[Auth] change_password: token verification failed")
         return False, "无效令牌"
 
     conn = get_db()
@@ -105,9 +141,15 @@ def change_user_password(token, old_password, new_password):
 
     if not user:
         conn.close()
+        print(f"[Auth] change_password: user not found, user_id={payload['user_id']}")
         return False, "用户不存在"
 
-    if not _verify_password(old_password, user["password_hash"]):
+    print(f"[Auth] change_password: user_id={user['id']}, hash_prefix={user['password_hash'][:30]}...")
+    print(f"[Auth] change_password: old_password='{old_password}' (len={len(old_password)})")
+    verify_result = _verify_password(old_password, user["password_hash"])
+    print(f"[Auth] change_password: _verify_password result={verify_result}")
+
+    if not verify_result:
         conn.close()
         return False, "旧密码错误"
 

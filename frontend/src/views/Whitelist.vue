@@ -3,15 +3,23 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>设备白名单管理</span>
+          <div class="header-left">
+            <span>设备白名单管理</span>
+            <el-tag v-if="alertStore.accessListMode === 'whitelist'" type="success" size="small" class="active-badge">
+              当前生效中
+            </el-tag>
+          </div>
           <div class="header-actions">
-            <el-switch
-              :model-value="alertStore.accessListMode === 'whitelist'"
-              @change="toggleWhitelistMode"
-              active-text="已启用"
-              inactive-text="未启用"
-              style="margin-right: 12px;"
-            />
+            <div class="toggle-wrapper">
+              <span class="toggle-label">启用白名单</span>
+              <el-switch
+                :model-value="alertStore.accessListMode === 'whitelist'"
+                @change="toggleWhitelistMode"
+                active-text="开"
+                inactive-text="关"
+                size="large"
+              />
+            </div>
             <el-button type="primary" size="small" @click="showAddDialog">
               <el-icon><Plus /></el-icon>
               添加设备
@@ -21,13 +29,28 @@
       </template>
 
       <el-alert
-        title="白名单说明"
-        type="success"
+        v-if="alertStore.accessListMode !== 'whitelist'"
+        title="白名单未启用"
+        type="info"
         :closable="false"
+        show-icon
         style="margin-bottom: 20px;"
       >
         <template #default>
-          <p>白名单中的设备将被视为可信设备，不会触发安全告警。建议将已知的合法设备加入白名单。</p>
+          <p>白名单模式当前未启用。启用后，白名单中的设备将被视为可信设备，不会触发安全告警。注意：白名单和黑名单不能同时启用。</p>
+        </template>
+      </el-alert>
+
+      <el-alert
+        v-else
+        title="白名单已启用"
+        type="success"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 20px;"
+      >
+        <template #default>
+          <p>白名单模式已启用，名单中的设备将不会触发安全告警。建议将已知的合法设备加入白名单。当前黑名单模式已自动关闭。</p>
         </template>
       </el-alert>
 
@@ -83,13 +106,33 @@ onMounted(() => {
 })
 
 const toggleWhitelistMode = (enabled) => {
-  const prev = alertStore.accessListMode
-  alertStore.setAccessListMode(enabled ? 'whitelist' : '')
-  if (enabled) {
-    ElMessage.success(prev === 'blacklist' ? '已切换为白名单模式' : '已启用白名单模式')
+  if (!enabled) {
+    // Simply turn off whitelist mode
+    alertStore.setAccessListMode('')
+    ElMessage.info('已关闭白名单模式')
     return
   }
-  ElMessage.info('已关闭名单控制')
+
+  // Enabling whitelist - check if blacklist is currently active
+  const prev = alertStore.accessListMode
+  if (prev === 'blacklist') {
+    ElMessageBox.confirm(
+      '当前黑名单模式已启用，启用白名单将自动关闭黑名单模式。是否继续？',
+      '切换名单模式',
+      {
+        confirmButtonText: '确认切换',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(() => {
+      alertStore.setAccessListMode('whitelist')
+      ElMessage.success('已切换为白名单模式，黑名单已自动关闭')
+    }).catch(() => {})
+    return
+  }
+
+  alertStore.setAccessListMode('whitelist')
+  ElMessage.success('已启用白名单模式')
 }
 
 const showAddDialog = () => {
@@ -154,9 +197,32 @@ const removeDevice = (mac) => {
   align-items: center;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 16px;
+}
+
+.toggle-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.active-badge {
+  font-size: 12px;
 }
 
 .mac-address {

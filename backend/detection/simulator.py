@@ -39,6 +39,7 @@ class SimulatorDataGenerator:
         self._krack_fired = False
         self._weak_password_checked = True
         self._weak_password_fired = False
+        self._weak_encryption_fired = False
 
     def tick(self):
         self._tick_count += 1
@@ -86,6 +87,10 @@ class SimulatorDataGenerator:
         wp = self._get_weak_password_alert()
         if wp:
             attacks.append(wp)
+
+        we = self._get_weak_encryption_alert()
+        if we:
+            attacks.append(we)
 
         kr = self._get_krack_alert()
         if kr:
@@ -211,6 +216,19 @@ class SimulatorDataGenerator:
             }
         return None
 
+    def _get_weak_encryption_alert(self):
+        if not self._weak_encryption_fired:
+            self._weak_encryption_fired = True
+            return {
+                "type": "弱加密协议",
+                "severity": "medium",
+                "sourceMac": "N/A",
+                "targetMac": "AA:BB:CC:DD:EE:03",
+                "timestamp": now_str(),
+                "suggestion": "检测到网络使用不安全的加密协议（WEP/WPA/WPA2-TKIP），攻击者可利用已知漏洞破解WiFi密码或解密通信内容。建议将加密协议升级至WPA2-AES或WPA3-SAE，并确保禁用WEP和WPA-TKIP等过时协议。",
+            }
+        return None
+
     def _get_krack_alert(self):
         if self._krack_checked and not self._krack_fired:
             self._krack_fired = True
@@ -220,6 +238,6 @@ class SimulatorDataGenerator:
                 "sourceMac": "N/A",
                 "targetMac": "AA:BB:CC:DD:EE:03",
                 "timestamp": now_str(),
-                "suggestion": "检测到网络使用不安全的加密协议（WPA2-TKIP），存在KRACK（Key Reinstallation Attack）漏洞风险。建议立即升级AP固件至最新版本，并将加密方式切换为WPA2-AES（CCMP）或WPA3。同时确保所有客户端设备已安装最新的安全补丁。",
+                "suggestion": "检测到KRACK（Key Reinstallation Attack）漏洞风险，攻击者可在WPA2四次握手中重放密钥安装消息，导致nonce/计数器重置，从而解密和伪造数据包。建议立即升级AP和客户端固件至最新版本，使用WPA3-SAE可从根本上避免此漏洞。",
             }
         return None

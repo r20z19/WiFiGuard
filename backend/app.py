@@ -9,6 +9,8 @@ from routes import register_routes
 
 from detection.engine import DetectionEngine
 
+from services.auth_service import require_auth
+
 
 FRONTEND_DIST = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")

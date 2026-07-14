@@ -10,7 +10,7 @@ class WeakPasswordDetector(BaseDetector):
         "建议使用包含大小写字母、数字和特殊字符的至少12位密码，并避免使用默认SSID和默认密码。"
     )
 
-    # Common weak SSID patterns that suggest default/weak configuration
+    # Common weak/default SSID patterns that suggest default configuration
     WEAK_SSID_PATTERNS = [
         "TP-LINK", "TP-Link", "tplink", "TPLink",
         "D-Link", "dlink", "DLINK",

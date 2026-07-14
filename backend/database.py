@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS alerts_history (
     target_mac TEXT,
     timestamp TEXT NOT NULL,
     suggestion TEXT,
-    status TEXT DEFAULT '已处理',
+    status TEXT DEFAULT '已删除',
     cleared_at TEXT
 );
 
@@ -118,12 +118,30 @@ def init_db():
 
 
 def _init_default_user(conn):
-    exists = conn.execute("SELECT id FROM users WHERE username = ?", ("admin",)).fetchone()
-    if not exists:
-        from services.auth_service import _hash_password
+    from services.auth_service import _hash_password, _verify_password
 
-        password_hash = _hash_password("123123")
+    exists = conn.execute(
+        "SELECT id, is_first_login FROM users WHERE username = ?", ("admin",)
+    ).fetchone()
+    if not exists:
+        password_hash = _hash_password("admin")
         conn.execute(
             "INSERT INTO users (username, password_hash, is_first_login, created_at) VALUES (?, ?, 1, datetime('now'))",
             ("admin", password_hash),
         )
+        print("[DB] Created default admin user with password 'admin'")
+        # Verify the hash works
+        assert _verify_password("admin", password_hash), "Default password hash verification failed!"
+        print("[DB] Default password hash verified OK")
+    elif exists["is_first_login"] == 1:
+        # Update default password for existing first-login users
+        password_hash = _hash_password("admin")
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (password_hash, exists["id"]),
+        )
+        print("[DB] Updated existing admin user password to 'admin'")
+        assert _verify_password("admin", password_hash), "Updated password hash verification failed!"
+        print("[DB] Updated password hash verified OK")
+    else:
+        print(f"[DB] Admin user exists but is_first_login={exists['is_first_login']}, not updating password")

@@ -14,8 +14,9 @@
         <p class="app-subtitle">智能无线入侵检测与预警系统</p>
       </div>
 
-      <!-- Login form -->
+      <!-- Login form (hidden when first-login dialog is shown) -->
       <el-form
+        v-if="!showChangePassword"
         ref="loginFormRef"
         :model="loginForm"
         :rules="loginRules"
@@ -54,6 +55,7 @@
           </el-button>
         </el-form-item>
       </el-form>
+
     </div>
 
     <!-- First-login password change dialog -->
@@ -62,10 +64,12 @@
       title="修改默认密码"
       width="400px"
       :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
     >
       <div class="password-change-tip">
         <el-icon class="tip-icon"><WarningFilled /></el-icon>
-        <span>首次登录，请修改默认密码</span>
+        <span>首次登录，必须修改默认密码后才能使用系统</span>
       </div>
       <el-form
         ref="changePwdFormRef"
@@ -157,6 +161,7 @@ const changePwdRules = {
   ]
 }
 
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   await loginFormRef.value.validate(async (valid) => {
@@ -193,7 +198,7 @@ const handleChangePassword = async () => {
         newPassword: changePwdForm.newPassword
       })
       authStore.setUserInfo({
-        username: loginForm.username,
+        username: loginForm.username || authStore.userInfo.username || 'admin',
         isFirstLogin: false
       })
       showChangePassword.value = false
@@ -283,7 +288,7 @@ const handleChangePassword = async () => {
 
 .login-header {
   text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .logo-wrapper {
@@ -317,7 +322,7 @@ const handleChangePassword = async () => {
 }
 
 .login-form {
-  margin-top: 30px;
+  margin-top: 20px;
 }
 
 .login-form :deep(.el-input__wrapper) {
