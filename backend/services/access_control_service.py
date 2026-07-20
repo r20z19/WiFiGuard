@@ -2,6 +2,7 @@ import shutil
 import subprocess
 import time
 
+from services.log_service import add_log
 from config import (
     ACCESS_CONTROL_MODE,
     DEAUTH_COOLDOWN_SECONDS,
@@ -68,6 +69,7 @@ class AccessController:
             print("[准入控制] 已发送下线帧: client={} ap={} mode={}".format(
                 client_mac, ap_bssid, self.mode
             ))
+            add_log("WARNING", "device", f"设备被踢下线: {client_mac}", f"AP={ap_bssid} 模式={self.mode}")
             return True
         except OSError as exc:
             print("[准入控制] 踢下线失败 {}: {}".format(client_mac, exc))

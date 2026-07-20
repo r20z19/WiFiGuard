@@ -44,6 +44,8 @@ if __name__ == "__main__":
     app = create_app()
 
     engine = DetectionEngine()
+    from services.log_service import add_log
+    add_log("INFO", "system", "系统启动", f"模式: {'模拟' if os.environ.get('WIFIGUARD_SIM','true')=='true' else '监听'}")
     engine.start()
 
     debug = os.environ.get("WIFIGUARD_DEBUG", "false").lower() == "true"

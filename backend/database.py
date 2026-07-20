@@ -81,6 +81,15 @@ CREATE TABLE IF NOT EXISTS email_records (
     recipient TEXT NOT NULL,
     status TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS system_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    level TEXT NOT NULL DEFAULT 'INFO',
+    category TEXT NOT NULL DEFAULT 'system',
+    message TEXT NOT NULL,
+    detail TEXT DEFAULT ''
+);
 """
 
 

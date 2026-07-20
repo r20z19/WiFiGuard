@@ -75,4 +75,12 @@ export const verifyLogin = () => api.get('/auth/verify')
 
 export const changePassword = (data) => api.post('/auth/change-password', data)
 
+export const getNetworkLocations = () => api.get('/geo/locations')
+
+export const getIpLocation = (ip) => api.get('/geo/ip', { params: { ip } })
+
+export const getLogs = (params) => api.get('/logs', { params })
+export const getLogStats = () => api.get('/logs/stats')
+export const exportLogs = (params) => api.get('/logs/export', { params, responseType: 'blob' })
+
 export default api

@@ -210,6 +210,8 @@ class DetectionEngine:
                 time.sleep(DETECTION_INTERVAL)
             except Exception as e:
                 print("[!] 检测循环异常: {}".format(e))
+                from services.log_service import add_log
+                add_log("ERROR", "system", "检测引擎异常", str(e))
                 time.sleep(DETECTION_INTERVAL)
 
     def _target_configured(self):

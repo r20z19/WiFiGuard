@@ -1,5 +1,6 @@
 from database import get_db
 from utils.time_utils import now_str
+from services.log_service import add_log
 
 
 def get_current_alerts():
@@ -55,6 +56,17 @@ def create_alert(alert_data):
     conn.commit()
     alert_id = cursor.lastrowid
     conn.close()
+    # Log the attack detection
+    severity = alert_data.get("severity", "medium")
+    log_level = "ERROR" if severity in ("critical", "high") else "WARNING"
+    add_log(
+        level=log_level,
+        category="attack",
+        message=f"检测到攻击: {alert_data['type']}",
+        detail=f"源MAC={alert_data.get('sourceMac', alert_data.get('source_mac', ''))} "
+               f"目标MAC={alert_data.get('targetMac', alert_data.get('target_mac', ''))} "
+               f"严重等级={severity}",
+    )
     return alert_id
 
 
@@ -87,6 +99,7 @@ def clear_alert(alert_id):
     conn.execute("DELETE FROM alerts_current WHERE id = ?", (alert_id,))
     conn.commit()
     conn.close()
+    add_log("INFO", "attack", f"告警已处理: #{alert_id}", f"类型={alert.get('type','')} 源={alert.get('sourceMac','')}")
     return True
 
 

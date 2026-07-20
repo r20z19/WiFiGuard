@@ -1,6 +1,7 @@
 from database import get_db
 from utils.time_utils import now_str
 from utils.mac_utils import normalize_mac
+from services.log_service import add_log
 
 
 def get_all():
@@ -34,6 +35,7 @@ def add(mac, name):
     )
     conn.commit()
     conn.close()
+    add_log("INFO", "config", f"设备加入白名单: {mac}", f"名称={name}")
     return True, None
 
 
@@ -43,6 +45,7 @@ def remove(mac):
     conn.execute("DELETE FROM whitelist WHERE mac = ?", (mac,))
     conn.commit()
     conn.close()
+    add_log("INFO", "config", f"设备移出白名单: {mac}")
 
 
 def is_whitelisted(mac):

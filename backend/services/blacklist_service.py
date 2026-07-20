@@ -1,6 +1,7 @@
 from database import get_db
 from utils.time_utils import now_str
 from utils.mac_utils import normalize_mac
+from services.log_service import add_log
 
 
 def get_all():
@@ -40,6 +41,7 @@ def add(mac, name, reason):
     )
     conn.commit()
     conn.close()
+    add_log("WARNING", "config", f"设备加入黑名单: {mac}", f"名称={name} 原因={reason}")
     return True, None
 
 
@@ -49,6 +51,7 @@ def remove(mac):
     conn.execute("DELETE FROM blacklist WHERE mac = ?", (mac,))
     conn.commit()
     conn.close()
+    add_log("INFO", "config", f"设备移出黑名单: {mac}")
 
 
 def is_blacklisted(mac):

@@ -4,6 +4,7 @@ from email.mime.multipart import MIMEMultipart
 
 from database import get_db
 from utils.time_utils import now_str
+from services.log_service import add_log
 
 
 def get_config():
@@ -98,8 +99,10 @@ def send_alert(alert_type, severity, source_mac, target_mac, timestamp, suggesti
             body=body,
         )
         _record_email(alert_type, config["recipientEmail"], "成功")
+        add_log("INFO", "system", f"邮件告警已发送: {alert_type}", f"收件人={config['recipientEmail']}")
     except Exception as e:
         _record_email(alert_type, config["recipientEmail"], "失败")
+        add_log("ERROR", "system", f"邮件告警发送失败: {alert_type}", str(e))
 
 
 def get_records():

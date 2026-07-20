@@ -48,6 +48,24 @@ const routes = [
     name: 'Email',
     component: () => import('../views/Email.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/map',
+    name: 'NetworkMap',
+    component: () => import('../views/NetworkMap.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/logs',
+    name: 'Logs',
+    component: () => import('../views/Logs.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/report',
+    name: 'Report',
+    component: () => import('../views/Report.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

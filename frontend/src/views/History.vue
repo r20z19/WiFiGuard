@@ -5,6 +5,11 @@
         <div class="card-header">
           <span>历史告警记录</span>
           <div class="header-actions">
+            <el-button-group size="small" style="margin-right:10px">
+              <el-button :type="dateQuick === 'today' ? 'primary' : ''" @click="setDateQuick('today')">今天</el-button>
+              <el-button :type="dateQuick === 'week' ? 'primary' : ''" @click="setDateQuick('week')">本周</el-button>
+              <el-button :type="dateQuick === 'month' ? 'primary' : ''" @click="setDateQuick('month')">本月</el-button>
+            </el-button-group>
             <el-date-picker
               v-model="dateRange"
               type="daterange"
@@ -33,6 +38,18 @@
           </div>
         </div>
       </template>
+
+      <!-- Quick stats -->
+      <el-row :gutter="12" style="margin-bottom:12px">
+        <el-col :span="4"><div class="stat-mini">总计 <b>{{ filteredAlerts.length }}</b></div></el-col>
+        <el-col :span="4"><div class="stat-mini red">严重 <b>{{ filteredAlerts.filter(a=>a.severity==='critical').length }}</b></div></el-col>
+        <el-col :span="4"><div class="stat-mini orange">高危 <b>{{ filteredAlerts.filter(a=>a.severity==='high').length }}</b></div></el-col>
+        <el-col :span="4"><div class="stat-mini yellow">中危 <b>{{ filteredAlerts.filter(a=>a.severity==='medium').length }}</b></div></el-col>
+        <el-col :span="4"><div class="stat-mini">低危 <b>{{ filteredAlerts.filter(a=>a.severity==='low').length }}</b></div></el-col>
+        <el-col :span="4" style="text-align:right">
+          <el-button size="small" @click="exportCSV">📥 导出CSV</el-button>
+        </el-col>
+      </el-row>
 
       <el-table :data="filteredAlerts" style="width: 100%" stripe>
         <el-table-column prop="timestamp" label="告警时间" width="180" />
@@ -96,11 +113,36 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useAlertStore } from '../store/alert'
+import { ElMessage } from 'element-plus'
 
 const alertStore = useAlertStore()
 const dateRange = ref([])
 const filterType = ref('')
 const filterStatus = ref('')
+const dateQuick = ref('')
+
+function setDateQuick(period) {
+  dateQuick.value = period
+  const now = new Date()
+  const start = new Date()
+  if (period === 'today') start.setHours(0,0,0,0)
+  else if (period === 'week') start.setDate(now.getDate() - now.getDay())
+  else if (period === 'month') start.setDate(1)
+  dateRange.value = [start, now]
+  fetchWithFilters()
+}
+
+function exportCSV() {
+  const rows = filteredAlerts.value
+  if (!rows.length) return ElMessage.warning('无数据可导出')
+  const header = '时间,攻击类型,严重等级,源MAC,目标MAC,状态,建议'
+  const csv = [header, ...rows.map(r => `"${r.timestamp}","${r.type}","${r.severity}","${r.sourceMac}","${r.targetMac||''}","${r.status}","${(r.suggestion||'').replace(/"/g,'""')}"`)].join('\n')
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8'})
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href=url; a.download='wifiguard-history.csv'; a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('导出成功')
+}
 const currentPage = ref(1)
 const pageSize = ref(10)
 const detailVisible = ref(false)
@@ -182,4 +224,8 @@ const handlePageChange = (page) => {
   display: flex;
   align-items: center;
 }
+.stat-mini { padding: 8px 10px; background:#f5f7fa; border-radius:8px; text-align:center; font-size:12px; color:#909399; }
+.stat-mini b { display:block; font-size:20px; color:#303133; }
+.stat-mini.red b { color:#f56c6c; }
+.stat-mini.orange b, .stat-mini.yellow b { color:#e6a23c; }
 </style>

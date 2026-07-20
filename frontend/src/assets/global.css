@@ -35,3 +35,74 @@ html, body {
 .el-input__wrapper {
   --el-input-border-radius: 4px;
 }
+
+/* ====== DARK MODE ====== */
+html.dark {
+  --dark-bg: #141414;
+  --dark-bg-secondary: #1d1d1d;
+  --dark-bg-elevated: #282828;
+  --dark-border: #333;
+  --dark-text: #e0e0e0;
+  --dark-text-secondary: #999;
+}
+
+html.dark body { background: var(--dark-bg); color: var(--dark-text); }
+
+/* Sidebar */
+html.dark .app-aside { background: var(--dark-bg-secondary); }
+html.dark .side-menu { background: var(--dark-bg-secondary); }
+html.dark .el-menu-item { color: var(--dark-text-secondary); }
+html.dark .el-menu-item:hover { background: rgba(255,255,255,0.04); }
+html.dark .el-menu-item.is-active { color: #409eff; }
+
+/* Cards & panels */
+html.dark .el-card { background: var(--dark-bg-secondary); border-color: var(--dark-border); }
+html.dark .el-card__header { border-color: var(--dark-border); color: var(--dark-text); }
+html.dark .el-card__body { color: var(--dark-text-secondary); }
+
+/* Tables */
+html.dark .el-table { --el-table-bg-color: var(--dark-bg-secondary); --el-table-tr-bg-color: var(--dark-bg-secondary); --el-table-header-bg-color: var(--dark-bg-elevated); --el-table-row-hover-bg-color: rgba(255,255,255,0.03); --el-table-border-color: var(--dark-border); --el-table-text-color: var(--dark-text); --el-table-header-text-color: var(--dark-text-secondary); }
+
+/* Main content area */
+html.dark .app-main { background: var(--dark-bg); }
+
+/* Dashboard specific */
+html.dark .view-toggle-bar { background: var(--dark-bg-secondary); }
+html.dark .status-card { background: var(--dark-bg-secondary); border-color: var(--dark-border); }
+html.dark .card-value { color: var(--dark-text); }
+html.dark .card-footer { border-color: var(--dark-border); }
+html.dark .suggestion-card { background: var(--dark-bg-elevated); border-color: var(--dark-border); }
+html.dark .sug-title { color: var(--dark-text); }
+html.dark .sug-desc { color: var(--dark-text-secondary); }
+html.dark .device-row { border-color: var(--dark-border); }
+html.dark .dev-mac { color: var(--dark-text); }
+
+/* Dialogs, popovers, dropdowns */
+html.dark .el-dialog { background: var(--dark-bg-secondary); }
+html.dark .el-popover { background: var(--dark-bg-elevated); }
+html.dark .el-dropdown-menu { background: var(--dark-bg-elevated); }
+html.dark .el-dropdown-menu__item { color: var(--dark-text); }
+html.dark .el-dropdown-menu__item:hover { background: rgba(255,255,255,0.04); }
+
+/* Forms */
+html.dark .el-input__wrapper { background: var(--dark-bg); box-shadow: 0 0 0 1px var(--dark-border) inset; }
+html.dark .el-input__inner { color: var(--dark-text); }
+html.dark .el-select .el-input.is-focus .el-input__wrapper { box-shadow: 0 0 0 1px #409eff inset; }
+
+/* Tags & badges */
+html.dark .el-tag--info { --el-tag-bg-color: rgba(144,147,153,0.15); --el-tag-text-color: #a0a0a0; }
+html.dark .el-tag--success { --el-tag-bg-color: rgba(103,194,58,0.15); }
+
+/* Pagination */
+html.dark .el-pagination button, html.dark .el-pager li { background: var(--dark-bg-secondary); color: var(--dark-text); }
+html.dark .el-pager li.is-active { background: #409eff; }
+
+/* Empty state */
+html.dark .el-empty__description { color: var(--dark-text-secondary); }
+
+/* Statistics */
+html.dark .el-statistic__number { color: var(--dark-text); }
+
+/* Tabs / Radio buttons */
+html.dark .el-radio-button__inner { background: var(--dark-bg-secondary); border-color: var(--dark-border); color: var(--dark-text-secondary); }
+html.dark .el-radio-button:first-child .el-radio-button__inner { border-left-color: var(--dark-border); }
