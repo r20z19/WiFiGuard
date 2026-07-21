@@ -68,11 +68,29 @@
             <div v-if="devices.length === 0" class="lp-empty">暂无设备</div>
           </div>
         </div>
+        <!-- Zoom controls -->
+        <div class="lp-section">
+          <div class="lp-title">🔍 缩放控制</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <el-button size="small" circle @click="zoomIn">＋</el-button>
+            <span style="font-size:11px;color:#8899aa;min-width:36px;text-align:center">{{ Math.round(zoomLevel * 100) }}%</span>
+            <el-button size="small" circle @click="zoomOut">－</el-button>
+            <el-button size="small" @click="zoomReset">重置</el-button>
+          </div>
+        </div>
       </div>
 
       <!-- CENTER: Room -->
-      <div class="room-area" ref="roomRef">
-        <svg class="lines-layer">
+      <div class="room-area" ref="roomRef"
+        @mousedown="startPan" @mousemove="onPan" @mouseup="endPan" @mouseleave="endPan"
+        :style="{ cursor: isPanning ? 'grabbing' : 'grab' }"
+      >
+        <!-- Room border (fixed, outside zoom) -->
+        <div class="room-walls"></div>
+
+        <!-- Zoomable content -->
+        <div class="room-zoom-layer" :style="{ transform: `translate(${panX}px,${panY}px) scale(${zoomLevel})`, transformOrigin: 'center center' }">
+        <svg class="lines-layer" :key="'svg-'+roomVersion">
           <line v-for="conn in connections" :key="conn.mac"
             :x1="apX" :y1="apY" :x2="conn.x" :y2="conn.y"
             :stroke="getDisplayColor(conn.colors) ? getDisplayColor(conn.colors) + '88' : '#4488ff22'"
@@ -111,7 +129,7 @@
           />
         </svg>
 
-        <div class="room-walls">
+        <div class="room-inner">
           <!-- Wall texture lines -->
           <div class="wall-top"></div>
           <div class="wall-bottom"></div>
@@ -184,11 +202,11 @@
 
         <!-- Device cards -->
         <div
-          v-for="dev in positionedDevices" :key="dev.mac"
+          v-for="dev in positionedDevices" :key="dev.mac + '-' + roomVersion"
           class="device-card"
           :class="[
             dev._dtype === 'attacker' ? 'card-attacker' : '',
-            dev._dtype === 'target' ? 'card-target' : '',
+            attacksForDevice(dev.mac).length > 0 && dev._dtype !== 'attacker' ? 'card-target' : '',
             selectedMac === dev.mac ? 'card-selected' : '',
             attacksForDevice(dev.mac).length > 0 && dev._dtype !== 'attacker' ? 'card-under-attack' : '',
           ]"
@@ -222,7 +240,7 @@
 
         <!-- Attackers outside -->
         <div
-          v-for="atk in positionedAttackers" :key="atk.mac"
+          v-for="atk in positionedAttackers" :key="atk.mac + '-' + roomVersion"
           class="attacker-outer"
           :class="[
             { 'card-selected': selectedMac === atk.mac },
@@ -251,7 +269,9 @@
           <div class="atk-mac">{{ atk.mac?.slice(-8) }}</div>
         </div>
 
-        <!-- Hover tooltip -->
+        </div><!-- end room-zoom-layer -->
+
+        <!-- Hover tooltip (outside zoom layer) -->
         <div v-if="hoveredMac && hoveredDevice"
           class="hover-card"
           :style="{ left: hoverX + 14 + 'px', top: hoverY - 14 + 'px' }"
@@ -407,6 +427,16 @@ const roomRef = ref(null)
 const devices = ref([])
 const activeAlerts = ref([])
 const selectedMac = ref(null)
+const zoomLevel = ref(1.0)
+const panX = ref(0); const panY = ref(0)
+const isPanning = ref(false)
+let panStartX = 0; let panStartY = 0
+function zoomIn() { zoomLevel.value = Math.min(2.0, +(zoomLevel.value + 0.2).toFixed(1)) }
+function zoomOut() { zoomLevel.value = Math.max(0.4, +(zoomLevel.value - 0.2).toFixed(1)) }
+function zoomReset() { zoomLevel.value = 1.0; panX.value = 0; panY.value = 0 }
+function startPan(e) { isPanning.value = true; panStartX = e.clientX - panX.value; panStartY = e.clientY - panY.value }
+function onPan(e) { if (isPanning.value) { panX.value = e.clientX - panStartX; panY.value = e.clientY - panStartY } }
+function endPan() { isPanning.value = false }
 const hoveredMac = ref(null)
 const hoveredDevice = ref(null)
 const hoverX = ref(0); const hoverY = ref(0)
@@ -423,16 +453,22 @@ for (const [k, v] of Object.entries(DEVICE_ICONS)) iconImgs[k] = v.replace('imag
 
 // ---- Room size ----
 const apX = ref(0); const apY = ref(0)
-let ROOM_W = 800; let ROOM_H = 500
-let AP_X = 400; let AP_Y = 250
-const ROOM_PAD = 60
+const ROOM_W = ref(800); const ROOM_H = ref(500)
+const AP_X = ref(400); const AP_Y = ref(250)
+const roomVersion = ref(0)
+const ROOM_PAD = 30
+let roomResizeObs = null
 
 function updateRoomSize() {
   if (!roomRef.value) return
-  ROOM_W = roomRef.value.clientWidth
-  ROOM_H = roomRef.value.clientHeight
-  AP_X = ROOM_W / 2; AP_Y = ROOM_H / 2
-  apX.value = AP_X; apY.value = AP_Y
+  const w = roomRef.value.clientWidth
+  const h = roomRef.value.clientHeight
+  if (Math.abs(ROOM_W.value - w) < 2 && Math.abs(ROOM_H.value - h) < 2) return
+  ROOM_W.value = w
+  ROOM_H.value = h
+  AP_X.value = w / 2; AP_Y.value = h / 2
+  apX.value = AP_X.value; apY.value = AP_Y.value
+  roomVersion.value++
 }
 
 // ---- Computed ----
@@ -468,18 +504,19 @@ function signalBars(s) { if (s>=-50) return[1,2,3,4]; if(s>=-60) return[1,2,3]; 
 
 // Room-scale distance: maps the device's actual visual position to real-world meters.
 // Assumes a typical home room is ~12m across, so maxRadius maps to ~6m.
-const ROOM_SCALE = 6 / 300  // 300px ≈ 6m real distance (adjust based on typical room size)
-
 function calcDistance(dev) {
-  // Use the device's actual visual position relative to AP center
-  if (!dev || dev._x === undefined) return { text: '?m', val: 0 }
-  const dx = (dev._x + 70) - AP_X  // card center X
-  const dy = (dev._y + 42) - AP_Y  // card center Y
-  const pxDist = Math.sqrt(dx * dx + dy * dy)
-  const meters = pxDist * ROOM_SCALE
-  if (meters < 0.5) return { text: '<0.5m', val: 0.3 }
-  if (meters < 1) return { text: meters.toFixed(1) + 'm', val: meters }
-  return { text: Math.round(meters) + 'm', val: meters }
+  if (!dev) return { text: '?m', val: 0 }
+  const sig = dev.signal || -65
+  let m
+  if (sig >= -40) m = 0.5
+  else if (sig >= -50) m = 1 + (sig + 50) * (-0.2)
+  else if (sig >= -65) m = 3 + (sig + 65) * (-0.2)
+  else if (sig >= -75) m = 6 + (sig + 75) * (-0.3)
+  else m = 10 + Math.max(sig, -95) * (-0.3)
+  m = Math.max(0.3, Math.min(20, Math.round(m * 10) / 10))
+  if (m < 0.5) return { text: '<0.5m', val: 0.3 }
+  if (m < 1) return { text: m.toFixed(1) + 'm', val: m }
+  return { text: Math.round(m) + 'm', val: m }
 }
 
 function formatTime(ts) {
@@ -553,38 +590,83 @@ function getDeviceStatuses(dev) {
 const CARD_W = 155; const CARD_H = 100
 // Inner rings (excellent/good signal) larger → more room for devices
 // Outer rings (medium/poor) compressed → overall tighter, more orderly
-// Spread across 优50% + 良25% + 中15% + 弱10%
-const ringRatios = [0.10, 0.28, 0.45, 0.58, 0.68, 0.78, 0.88]
+// 8 rings with safe margins from walls
+const ringRatios = [0.08, 0.20, 0.32, 0.44, 0.56, 0.68, 0.78, 0.88]
 
 function calcRingPositions(devs) {
   const n = devs.length
   if (n === 0) return []
-  const maxR = Math.min(ROOM_W, ROOM_H) / 2 - ROOM_PAD
+  const maxR = Math.min(ROOM_W.value, ROOM_H.value) / 2 - ROOM_PAD
   const sorted = [...devs].sort((a, b) => (b.signal || -70) - (a.signal || -70))
+
+  // Map signal range to all rings proportionally (use full room width)
+  // Signal -30 → ring 0 (6%), Signal -90 → ring 9 (96%)
+  // Each ring has a capacity; if overflow, push to next outer ring (never inward)
+  const CARD_GAP = 115
+  const capacities = ringRatios.map(r => Math.max(1, Math.floor((2 * Math.PI * maxR * r) / CARD_GAP)))
+  const ringCounts = ringRatios.map(() => 0)
+  const deviceRings = new Array(n).fill(0)
+
+  for (let i = 0; i < n; i++) {
+    const sig = sorted[i].signal || -65
+    // Simple linear: stronger signal = closer to AP
+    // -30 dBm → ring 0 (8%), -90 dBm → ring 7 (88%)
+    const clamped = Math.max(-90, Math.min(-30, sig))
+    const t = (-clamped - 30) / 60  // 0=best, 1=worst
+    const targetRing = Math.round(t * (ringRatios.length - 1))
+    // Try to place at target ring or outward (never inward = preserve signal ordering)
+    let placed = false
+    for (let ri = targetRing; ri < ringRatios.length; ri++) {
+      if (ringCounts[ri] < capacities[ri]) {
+        ringCounts[ri]++
+        deviceRings[i] = ri
+        placed = true
+        break
+      }
+    }
+    // If all outer rings full, search inward (last resort, but maintain as best we can)
+    if (!placed) {
+      for (let ri = targetRing - 1; ri >= 0; ri--) {
+        if (ringCounts[ri] < capacities[ri]) {
+          ringCounts[ri]++
+          deviceRings[i] = ri
+          placed = true
+          break
+        }
+      }
+    }
+    if (!placed) {
+      ringCounts[ringRatios.length - 1]++
+      deviceRings[i] = ringRatios.length - 1
+    }
+  }
+
+  // Place devices evenly around each ring
+  const ringAngles = ringRatios.map(() => 0)
   const results = []
   for (let i = 0; i < n; i++) {
-    const d = sorted[i]
-    const sig = d.signal || -65
-    const sigNorm = Math.max(0, Math.min(1, (sig + 90) / 60))
-    const posRatio = i / n
-    const blended = sigNorm * 0.7 + posRatio * 0.3
-    const ringIdx = Math.min(ringRatios.length - 1, Math.floor(blended * ringRatios.length))
-    const r = maxR * ringRatios[ringIdx]
-    const baseAngle = (i / n) * Math.PI * 2
-    const ringOffset = ringIdx * 0.3
-    const angle = baseAngle + ringOffset
-    results.push({ device: d, x: AP_X + Math.cos(angle) * r - 70, y: AP_Y + Math.sin(angle) * r - 42 })
+    const ri = deviceRings[i]
+    const r = maxR * ringRatios[ri]
+    const count = ringCounts[ri]
+    const angle = (ri * 0.4) + (ringAngles[ri] / count) * Math.PI * 2
+    ringAngles[ri]++
+    results.push({
+      device: sorted[i],
+      x: AP_X.value + Math.cos(angle) * r - 50,
+      y: AP_Y.value + Math.sin(angle) * r - 40,
+    })
   }
   return results
 }
 
 const positionedDevices = computed(() => {
-  // Only users (non-router, non-attacker). Only ONE router at center.
+  roomVersion.value
   const normal = devices.value.filter(d => d._dtype !== 'attacker' && d._dtype !== 'router')
   return calcRingPositions(normal).map(p => ({ ...p.device, _x: p.x, _y: p.y }))
 })
 
 const positionedAttackers = computed(() => {
+  roomVersion.value
   const attackers = devices.value.filter(d => d._dtype === 'attacker')
   const n = attackers.length
   if (n === 0) return []
@@ -592,8 +674,8 @@ const positionedAttackers = computed(() => {
     const side = i % 2
     const perRow = Math.ceil(n / 2)
     const idxInRow = Math.floor(i / 2)
-    const x = 80 + (ROOM_W - 160) * ((idxInRow + 0.5) / perRow)
-    const y = side === 0 ? -40 : ROOM_H + 10
+    const x = 80 + (ROOM_W.value - 160) * ((idxInRow + 0.5) / perRow)
+    const y = side === 0 ? -40 : ROOM_H.value + 10
     return { ...d, _x: x - 50, _y: y }
   })
 })
@@ -638,21 +720,22 @@ function getConnectionClass(mac) {
   return ''
 }
 
-const connections = computed(() =>
-  positionedDevices.value.map(d => {
+const connections = computed(() => {
+  roomVersion.value  // dependency
+  return positionedDevices.value.map(d => {
     const srcAlerts = activeAlerts.value.filter(a => a.sourceMac === d.mac)
     const tgtAlerts = activeAlerts.value.filter(a => a.targetMac === d.mac)
     let direction = null  // null=no arrow, 'toDevice'=AP→device, 'toAP'=device→AP
     if (tgtAlerts.length > 0 && srcAlerts.length === 0) direction = 'toDevice'
     if (srcAlerts.length > 0) direction = 'toAP'
     return {
-      mac: d.mac, x: d._x + 70, y: d._y + 42,
+      mac: d.mac, x: d._x + 50, y: d._y + 40,
       colors: getConnectionColors(d.mac),
       cls: getConnectionClass(d.mac),
       direction,
     }
   })
-)
+})
 
 // Cycle multi-color lines: one color per second, cycling through all colors
 function getDisplayColor(colors) {
@@ -681,9 +764,9 @@ function calcArrowAt(x1, y1, x2, y2, fraction) {
 // Find victim device position (may be in users or attackers list)
 function findDevicePos(mac) {
   const dev = positionedDevices.value.find(d => d.mac === mac)
-  if (dev) return { x: dev._x + 70, y: dev._y + 42 }
+  if (dev) return { x: dev._x + 50, y: dev._y + 40 }
   const atk = positionedAttackers.value.find(d => d.mac === mac)
-  if (atk) return { x: atk._x + 50, y: atk._y + 30 }
+  if (atk) return { x: atk._x + 45, y: atk._y + 25 }
   return null
 }
 
@@ -696,9 +779,9 @@ const attackLines = computed(() => {
     seen.add(a.sourceMac)
     const victimPos = findDevicePos(a.targetMac)
     lines.push({
-      x1: src._x + 50, y1: src._y + 30,
-      x2: victimPos ? victimPos.x : AP_X,
-      y2: victimPos ? victimPos.y : AP_Y,
+      x1: src._x + 45, y1: src._y + 25,
+      x2: victimPos ? victimPos.x : AP_X.value,
+      y2: victimPos ? victimPos.y : AP_Y.value,
       attacker: src,
       status: getAttackStatus(src),
       color: a._color || '#ff2222',
@@ -764,6 +847,10 @@ async function fetchData() {
 onMounted(async () => {
   await nextTick(); updateRoomSize()
   window.addEventListener('resize', updateRoomSize)
+  if (roomRef.value) {
+    roomResizeObs = new ResizeObserver(() => updateRoomSize())
+    roomResizeObs.observe(roomRef.value)
+  }
   await fetchData()
   pollTimer = setInterval(fetchData, 10000)
   // Color cycle for multi-attack lines: switch every 1s
@@ -772,6 +859,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   if (colorCycleTimer) clearInterval(colorCycleTimer)
+  if (roomResizeObs) roomResizeObs.disconnect()
   window.removeEventListener('resize', updateRoomSize)
 })
 </script>
@@ -850,6 +938,13 @@ onUnmounted(() => {
 .room-area {
   flex: 1; position: relative; overflow: hidden;
   margin: 8px 8px 8px 8px;
+  border: 3px solid #2a3a5a; border-radius: 16px;
+  box-shadow: 0 0 0 8px #0a1220, 0 0 0 10px #1a2840;
+  background: #0a1220;
+}
+.room-zoom-layer {
+  position: absolute; inset: 0;
+  transition: transform 0.1s ease-out;
 }
 .lines-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 12; }
 .conn-line { transition: stroke 0.3s, stroke-width 0.3s; }
@@ -876,10 +971,16 @@ onUnmounted(() => {
 
 /* Room walls + inner details */
 .room-walls {
+  pointer-events: none;
   position: absolute; inset: 0;
-  border: 3px solid #2a3a5a; border-radius: 16px;
+  border-radius: 16px;
+  border: 3px solid #2a3a5a;
+  z-index: 20;
+}
+.room-inner {
+  position: absolute; inset: 0;
   background: #111a28;
-  box-shadow: inset 0 0 120px rgba(0,0,0,0.5), 0 0 0 8px #0a1220, 0 0 0 10px #1a2840;
+  box-shadow: inset 0 0 120px rgba(0,0,0,0.5);
   overflow: hidden;
 }
 .wall-top, .wall-bottom {
@@ -923,17 +1024,17 @@ onUnmounted(() => {
   position: absolute; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.04);
   top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;
 }
-.zone-1 { width: 50%; height: 50%; border: 1.5px dashed rgba(0,255,136,0.25); background: rgba(0,255,136,0.05); }
-.zone-2 { width: 75%; height: 75%; border: 1.5px dashed rgba(255,200,50,0.18); background: rgba(255,200,50,0.02); }
-.zone-3 { width: 90%; height: 90%; border: 1.5px dashed rgba(255,150,0,0.12); }
+.zone-1 { width: 48%; height: 48%; border: 1.5px dashed rgba(0,255,136,0.25); background: rgba(0,255,136,0.05); }
+.zone-2 { width: 72%; height: 72%; border: 1.5px dashed rgba(255,200,50,0.18); background: rgba(255,200,50,0.02); }
+.zone-3 { width: 88%; height: 88%; border: 1.5px dashed rgba(255,150,0,0.12); }
 .zone-4 { width: 100%; height: 100%; border: 1.5px dashed rgba(255,80,0,0.08); }
 .zone-label {
   position: absolute; font-size: 13px; font-weight: 700; pointer-events: none;
 }
-.zone-1 .zone-label { top: 30%; left: 65%; color: rgba(0,255,136,0.50); }
-.zone-2 .zone-label { top: 14%; left: 74%; color: rgba(255,200,50,0.45); }
-.zone-3 .zone-label { top: 5%; left: 82%; color: rgba(255,150,0,0.40); }
-.zone-4 .zone-label { top: 2%; left: 88%; color: rgba(255,80,0,0.35); }
+.zone-1 .zone-label { top: 32%; left: 66%; color: rgba(0,255,136,0.50); }
+.zone-2 .zone-label { top: 12%; left: 76%; color: rgba(255,200,50,0.45); }
+.zone-3 .zone-label { top: 4%; left: 84%; color: rgba(255,150,0,0.40); }
+.zone-4 .zone-label { top: 1%; left: 90%; color: rgba(255,80,0,0.35); }
 
 /* ====== FURNITURE ====== */
 .furn { position: absolute; z-index: 2; pointer-events: none; }
@@ -1024,9 +1125,9 @@ onUnmounted(() => {
 /* ====== DEVICE CARDS ====== */
 .device-card {
   position: absolute; z-index: 8;
-  width: 140px; background: rgba(20,28,44,0.94);
-  border: 1px solid rgba(68,136,255,0.25); border-radius: 12px;
-  padding: 10px 8px; text-align: center; cursor: pointer;
+  width: 100px; background: rgba(20,28,44,0.94);
+  border: 1px solid rgba(68,136,255,0.25); border-radius: 10px;
+  padding: 6px 5px; text-align: center; cursor: pointer;
   transition: all 0.2s; backdrop-filter: blur(4px);
 }
 .device-card:hover {
@@ -1042,15 +1143,15 @@ onUnmounted(() => {
   50% { box-shadow: 0 0 20px rgba(255,68,68,0.5), 0 0 40px rgba(255,68,68,0.2); }
 }
 
-.card-icon { width: 32px; height: 32px; margin-bottom: 5px; }
-.card-name { font-weight: 600; color: #dde8f0; font-size: 12px; margin-bottom: 2px; }
-.card-mac { color: #667788; font-family: monospace; font-size: 10px; margin-bottom: 4px; }
+.card-icon { width: 26px; height: 26px; margin-bottom: 3px; }
+.card-name { font-weight: 600; color: #dde8f0; font-size: 10px; margin-bottom: 1px; }
+.card-mac { color: #667788; font-family: monospace; font-size: 8px; margin-bottom: 2px; }
 .card-signal { display: flex; align-items: center; justify-content: center; gap: 1px; }
-.sig-bar { width: 3px; border-radius: 1px; }
+.sig-bar { width: 2px; border-radius: 1px; }
 .bar-1 { height: 6px; background: #334455; } .bar-2 { height: 9px; background: #334455; }
 .bar-3 { height: 13px; background: #e6a23c; } .bar-4 { height: 17px; background: #67c23a; }
-.sig-dbm { font-size: 10px; color: #778899; margin-left: 4px; }
-.card-dist { font-size: 10px; color: #448888; margin-top: 3px; font-weight: 500; }
+.sig-dbm { font-size: 8px; color: #778899; margin-left: 3px; }
+.card-dist { font-size: 8px; color: #448888; margin-top: 2px; font-weight: 500; }
 
 /* Device status badges */
 .device-status-badge {
@@ -1110,9 +1211,9 @@ onUnmounted(() => {
 /* Attackers */
 .attacker-outer {
   position: absolute; z-index: 8;
-  width: 90px; background: rgba(50,10,10,0.9);
+  width: 78px; background: rgba(50,10,10,0.9);
   border: 1px solid rgba(255,68,68,0.4); border-radius: 8px;
-  padding: 6px; text-align: center; cursor: pointer; transition: all 0.2s;
+  padding: 5px; text-align: center; cursor: pointer; transition: all 0.2s;
 }
 .attacker-outer:hover { border-color: rgba(255,68,68,0.8); box-shadow: 0 0 20px rgba(255,68,68,0.4); transform: scale(1.08); }
 .attacker-outer.card-selected { border-color: #fff !important; box-shadow: 0 0 0 3px #fff, 0 0 30px rgba(255,68,68,0.7) !important; }
