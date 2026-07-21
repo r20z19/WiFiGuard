@@ -124,6 +124,10 @@
             <el-icon><DataAnalysis /></el-icon>
             <span>安全报告</span>
           </el-menu-item>
+          <el-menu-item index="/ai">
+            <el-icon><Cpu /></el-icon>
+            <span>AI 功能</span>
+          </el-menu-item>
         </el-menu>
       </el-aside>
 
@@ -131,6 +135,9 @@
         <router-view />
       </el-main>
     </el-container>
+
+    <!-- AI Panel (floating) -->
+    <AiPanel ref="aiPanelRef" />
 
     <!-- Change Password Dialog -->
     <el-dialog v-model="showChangePwdDialog" title="修改密码" width="400px" :close-on-click-modal="false">
@@ -161,8 +168,10 @@ import { useAuthStore } from './store/auth'
 import { changePassword as apiChangePassword } from './api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Fold, Expand } from '@element-plus/icons-vue'
+import AiPanel from './components/AiPanel.vue'
 
 const router = useRouter()
+const aiPanelRef = ref(null)
 const route = useRoute()
 const alertStore = useAlertStore()
 const authStore = useAuthStore()
@@ -195,6 +204,7 @@ const currentRouteName = computed(() => {
     '/map': '网络拓扑',
     '/logs': '系统日志',
     '/report': '安全报告',
+    '/ai': 'AI 功能',
   }
   return map[route.path] || ''
 })

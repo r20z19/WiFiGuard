@@ -60,8 +60,10 @@
       </div>
     </el-card>
 
-    <!-- Main alert table -->
-    <el-card style="margin-top:12px">
+    <!-- Main content: table + detail panel -->
+    <div style="display:flex;gap:12px;margin-top:12px">
+    <div style="flex:1;min-width:0">
+    <el-card>
       <template #header>
         <div class="card-header">
           <span>告警列表</span>
@@ -76,7 +78,6 @@
         style="width: 100%"
         stripe
         @selection-change="onSelectionChange"
-        ref="tableRef"
       >
         <el-table-column type="selection" width="40" />
         <el-table-column prop="timestamp" label="告警时间" width="165" sortable />
@@ -102,70 +103,107 @@
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="toggleExpand(row)">建议</el-button>
+            <el-button type="primary" link size="small" @click="handleSuggest(row)">建议</el-button>
             <el-button type="warning" link size="small" @click="quickBlacklist(row)">加黑名单</el-button>
             <el-button type="danger" link size="small" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
 
-        <!-- Expandable row -->
-        <template #expanded="scope">
-          <div class="expanded-content">
-            <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="攻击类型">{{ scope.row.type }}</el-descriptions-item>
-              <el-descriptions-item label="严重等级">
-                <el-tag :type="getSeverityType(scope.row.severity)" size="small">{{ getSeverityLabel(scope.row.severity) }}</el-tag>
-              </el-descriptions-item>
-              <el-descriptions-item label="源MAC地址">
-                {{ scope.row.sourceMac }}
-                <span v-if="findDevice(scope.row.sourceMac)" class="device-hint">
-                  ({{ findDevice(scope.row.sourceMac).vendor || '未知厂商' }})
-                </span>
-              </el-descriptions-item>
-              <el-descriptions-item label="目标MAC地址">
-                {{ scope.row.targetMac || '-' }}
-                <span v-if="scope.row.targetMac && findDevice(scope.row.targetMac)" class="device-hint">
-                  ({{ findDevice(scope.row.targetMac).vendor || '未知厂商' }})
-                </span>
-              </el-descriptions-item>
-              <el-descriptions-item label="告警时间">{{ scope.row.timestamp }}</el-descriptions-item>
-            </el-descriptions>
-            <el-alert
-              title="安全建议"
-              type="info"
-              :closable="false"
-              show-icon
-              style="margin-top:12px"
-            >
-              <p style="margin:0;line-height:1.6">{{ scope.row.suggestion }}</p>
-            </el-alert>
-            <div class="expanded-actions">
-              <el-button type="danger" size="small" @click="oneClickDispose(scope.row)">⚡ 一键处置(拉黑+清除)</el-button>
-              <el-button size="small" @click="quickBlacklist(scope.row)">加黑名单</el-button>
-              <el-button size="small" @click="handleDelete(scope.row.id)">忽略</el-button>
-            </div>
-          </div>
-        </template>
       </el-table>
 
       <el-empty v-if="filteredAlerts.length === 0" description="当前无告警信息，系统运行正常" :image-size="80" />
     </el-card>
+    </div>
+
+    <!-- Right detail panel -->
+    <transition name="slide">
+      <div v-if="selectedAlert" class="detail-panel">
+        <div class="dp-header">
+          <span>📋 告警详情</span>
+          <el-button :icon="Close" circle size="small" text @click="selectedAlert = null" />
+        </div>
+        <div class="dp-body">
+          <el-descriptions :column="1" border size="small">
+            <el-descriptions-item label="攻击类型">
+              <el-tag :type="getAttackTag(selectedAlert.type)" size="small">{{ selectedAlert.type }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="严重等级">
+              <el-tag :type="getSeverityType(selectedAlert.severity)" size="small">{{ getSeverityLabel(selectedAlert.severity) }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="源MAC地址">
+              {{ selectedAlert.sourceMac }}
+              <span v-if="findDevice(selectedAlert.sourceMac)" class="device-hint">
+                ({{ findDevice(selectedAlert.sourceMac).vendor || '未知厂商' }})
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="目标MAC地址">
+              {{ selectedAlert.targetMac || '-' }}
+              <span v-if="selectedAlert.targetMac && findDevice(selectedAlert.targetMac)" class="device-hint">
+                ({{ findDevice(selectedAlert.targetMac).vendor || '未知厂商' }})
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="告警时间">{{ selectedAlert.timestamp }}</el-descriptions-item>
+          </el-descriptions>
+
+          <el-alert title="内置建议" type="info" :closable="false" show-icon style="margin-top:12px">
+            <p style="margin:0;line-height:1.6">{{ selectedAlert.suggestion || '暂无建议' }}</p>
+          </el-alert>
+
+          <div style="margin-top:12px">
+            <el-button type="warning" size="small" @click="aiInterpret(selectedAlert)" :loading="aiLoading === selectedAlert.id">
+              {{ aiResults.get(selectedAlert.id) ? '收起 AI 解读' : '🤖 AI 解读（含报文分析）' }}
+            </el-button>
+            <el-button v-if="selectedAlert" size="small" text @click="showFrameCtx = !showFrameCtx" style="margin-left:4px">
+              📡 {{ showFrameCtx ? '隐藏' : '查看' }}报文上下文
+            </el-button>
+          </div>
+
+          <div v-if="showFrameCtx && frameContext" class="ai-result-box" style="margin-top:8px;background:#f0f4f8;border-color:#c0c8d0">
+            <div class="ai-result-header" style="color:#445566">📡 报文上下文（发送给AI的数据）</div>
+            <div class="ai-result-text" style="color:#556677;font-size:11px;max-height:200px;overflow-y:auto">
+              <div v-if="frameContext.hasData">
+                <div>总事件：{{ frameContext.totalEvents }} | 攻击事件：{{ frameContext.attackEvents }}</div>
+                <div v-for="(evt, i) in (frameContext.recentActivity || [])" :key="i" style="margin-top:2px">{{ evt }}</div>
+              </div>
+              <div v-else>{{ frameContext.message }}</div>
+            </div>
+          </div>
+
+          <div v-if="aiResults.get(selectedAlert.id)" class="ai-result-box" style="margin-top:10px">
+            <div class="ai-result-header">🤖 AI 解读</div>
+            <div class="ai-result-text">{{ aiResults.get(selectedAlert.id) }}</div>
+          </div>
+
+          <div class="dp-actions" style="margin-top:14px">
+            <el-button type="danger" size="small" @click="oneClickDispose(selectedAlert)">⚡ 一键处置(拉黑+清除)</el-button>
+            <el-button size="small" @click="quickBlacklist(selectedAlert)">加黑名单</el-button>
+            <el-button size="small" @click="handleDelete(selectedAlert.id); selectedAlert = null">忽略</el-button>
+          </div>
+        </div>
+      </div>
+    </transition>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { Close } from '@element-plus/icons-vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import api, { interpretAlert } from '../api'
 
 const route = useRoute()
+const aiLoading = ref(false)
+const aiResults = ref(new Map())
 const alertStore = useAlertStore()
 const severityFilter = ref('all')
 const typeFilter = ref('')
 const selectedRows = ref([])
-const tableRef = ref(null)
-const expands = ref([])
+const selectedAlert = ref(null)
+const showFrameCtx = ref(false)
+const frameContext = ref(null)
 
 const attackTypes = ['Deauth攻击', '钓鱼AP', '暴力破解', '非法接入', 'Flood泛洪', '弱口令', '弱加密协议', 'KRACK风险']
 
@@ -232,6 +270,31 @@ function findDevice(mac) {
   return alertStore.onlineDevices.find(d => d.mac === mac) || null
 }
 
+async function aiInterpret(row) {
+  // Toggle: if already shown, hide it
+  if (aiResults.value.has(row.id)) {
+    const m = new Map(aiResults.value)
+    m.delete(row.id)
+    aiResults.value = m
+    return
+  }
+  // Call AI
+  aiLoading.value = row.id
+  try {
+    const resp = await interpretAlert({
+      type: row.type, severity: row.severity,
+      sourceMac: row.sourceMac, targetMac: row.targetMac,
+      timestamp: row.timestamp, suggestion: row.suggestion,
+    })
+    const m = new Map(aiResults.value)
+    m.set(row.id, resp.result)
+    aiResults.value = m
+  } catch (e) {
+    ElMessage.error('AI 解读失败，请检查 API Key 配置')
+  }
+  aiLoading.value = null
+}
+
 function filterBySource(mac) {
   typeFilter.value = ''
   // Find which types this source triggers and select the first or just filter differently
@@ -243,10 +306,12 @@ function onSelectionChange(rows) {
   selectedRows.value = rows
 }
 
-function toggleExpand(row) {
-  if (tableRef.value) {
-    tableRef.value.toggleRowExpansion(row)
-  }
+async function handleSuggest(row) {
+  selectedAlert.value = row; showFrameCtx.value = false
+  try {
+    frameContext.value = await api.get('/ai/frames', { params: { mac: row.sourceMac } })
+  } catch { frameContext.value = null }
+  if (!aiResults.value.has(row.id)) await aiInterpret(row)
 }
 
 const handleDelete = (id) => {
@@ -391,4 +456,24 @@ onMounted(() => {
 .expanded-content { padding: 12px 40px; }
 .expanded-actions { margin-top: 12px; display: flex; gap: 8px; }
 .device-hint { font-size: 12px; color: #67c23a; margin-left: 4px; }
+.ai-result-box { margin-top: 10px; padding: 12px; background: linear-gradient(135deg, #fef9e7, #fef5e0); border: 1px solid #f0d080; border-radius: 8px; }
+.ai-result-header { font-size: 13px; font-weight: 600; color: #b8860b; margin-bottom: 6px; }
+.ai-result-text { font-size: 13px; color: #665500; line-height: 1.7; }
+
+/* Right detail panel */
+.detail-panel {
+  width: 380px; flex-shrink: 0;
+  background: #fff; border-radius: 10px; border: 1px solid #ebeef5;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  align-self: flex-start;
+  position: sticky; top: 0;
+}
+.dp-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #ebeef5; font-weight: 600; font-size: 14px; }
+.dp-body { padding: 12px 16px; }
+.dp-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.slide-enter-active { transition: all 0.25s ease-out; }
+.slide-leave-active { transition: all 0.2s ease-in; }
+.slide-enter-from { transform: translateX(40px); opacity: 0; }
+.slide-leave-to { transform: translateX(40px); opacity: 0; }
 </style>

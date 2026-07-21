@@ -109,7 +109,10 @@
     <el-drawer v-model="drawerVisible" :title="drawerTitle" size="400px" direction="rtl">
       <template v-if="detailDevice">
         <div class="drawer-section">
-          <div class="drawer-section-title">设备标识</div>
+          <div class="drawer-section-title">设备标识
+            <el-button size="small" type="warning" text @click="aiIdentify" :loading="aiIdentifying" style="margin-left:8px">🤖 AI 识别</el-button>
+          </div>
+          <div v-if="aiDeviceResult" class="ai-identify-result">{{ aiDeviceResult }}</div>
           <el-descriptions :column="1" border size="small">
             <el-descriptions-item label="MAC地址">
               <span class="mono">{{ detailDevice.mac }}</span>
@@ -203,12 +206,15 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAlertStore } from '../store/alert'
 import { ElMessage } from 'element-plus'
+import { identifyDevice as aiIdentifyDevice } from '../api'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
 
 const alertStore = useAlertStore()
 const searchQuery = ref('')
 const drawerVisible = ref(false)
 const detailDevice = ref(null)
+const aiDeviceResult = ref('')
+const aiIdentifying = ref(false)
 
 const accessModeText = computed(() => {
   if (alertStore.accessListMode === 'whitelist') return '白名单模式'
@@ -355,6 +361,21 @@ const deviceAlerts = computed(() => {
   return alertStore.currentAlerts.filter(a => a.sourceMac === detailDevice.value.mac || a.targetMac === detailDevice.value.mac)
 })
 
+async function aiIdentify() {
+  if (!detailDevice.value) return
+  aiIdentifying.value = true; aiDeviceResult.value = ''
+  try {
+    const resp = await aiIdentifyDevice({ device: {
+      mac: detailDevice.value.mac, vendor: detailDevice.value.vendor,
+      ssid: detailDevice.value.ssid, signal: detailDevice.value.signal,
+      firstSeen: detailDevice.value.firstSeen, status: detailDevice.value.status,
+      pairwiseCipher: detailDevice.value.pairwiseCipher,
+    }})
+    aiDeviceResult.value = resp.result
+  } catch { ElMessage.error('AI 识别失败') }
+  aiIdentifying.value = false
+}
+
 function showDetail(row) {
   detailDevice.value = row
   drawerVisible.value = true
@@ -433,4 +454,5 @@ onMounted(() => {
 .tl-dot.green { background: #67c23a; }
 .tl-dot.blue { background: #409eff; }
 .tl-dot.red { background: #f56c6c; }
+.ai-identify-result { margin-top: 6px; padding: 8px 10px; background: #fef9e7; border: 1px solid #f0d080; border-radius: 6px; font-size: 12px; color: #665500; line-height: 1.6; }
 </style>

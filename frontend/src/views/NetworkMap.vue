@@ -328,7 +328,11 @@
                 <el-button size="small" type="danger" plain @click="quickBlacklist({mac: a.sourceMac, name: a.sourceMac})">
                   拉黑攻击源
                 </el-button>
+                <el-button size="small" type="warning" plain @click="aiInterpretAttack(a)" :loading="aiLoading === a.id">
+                  {{ aiResults.get(a.id) && aiExpanded.has(a.id) ? '收起解读' : '🤖 AI 解读' }}
+                </el-button>
               </div>
+              <div v-if="aiResults.get(a.id) && aiExpanded.has(a.id)" class="adc-ai-result">{{ aiResults.get(a.id) }}</div>
             </div>
           </div>
           <div class="rp-section" v-else>
@@ -394,7 +398,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getNetworkLocations } from '../api/index'
+import { getNetworkLocations, interpretAlert } from '../api/index'
 import { useAlertStore } from '../store/alert'
 import DEVICE_ICONS from '../assets/deviceIcons.json'
 
@@ -407,6 +411,9 @@ const hoveredMac = ref(null)
 const hoveredDevice = ref(null)
 const hoverX = ref(0); const hoverY = ref(0)
 const detailDevice = ref(null)
+const aiLoading = ref(null)
+const aiResults = ref(new Map())
+const aiExpanded = ref(new Set())
 
 let pollTimer = null
 let colorCycleTimer = null
@@ -706,6 +713,32 @@ function selectDevice(dev) {
   else { selectedMac.value = dev.mac; detailDevice.value = dev }
 }
 function hoverDevice(dev, ev) { hoveredMac.value = dev.mac; hoveredDevice.value = dev; hoverX.value = ev.clientX; hoverY.value = ev.clientY }
+async function aiInterpretAttack(alert) {
+  // Toggle collapse if already shown
+  if (aiResults.value.has(alert.id)) {
+    const s = new Set(aiExpanded.value)
+    if (s.has(alert.id)) { s.delete(alert.id) } else { s.add(alert.id) }
+    aiExpanded.value = s
+    return
+  }
+  // Call AI
+  aiLoading.value = alert.id
+  try {
+    const resp = await interpretAlert({
+      type: alert.type, severity: alert.severity,
+      sourceMac: alert.sourceMac, targetMac: alert.targetMac,
+      timestamp: alert.timestamp, suggestion: alert.suggestion,
+    })
+    const m = new Map(aiResults.value)
+    m.set(alert.id, resp.result)
+    aiResults.value = m
+    const s = new Set(aiExpanded.value)
+    s.add(alert.id)
+    aiExpanded.value = s
+  } catch { ElMessage.error('AI 解读失败，请检查 API Key') }
+  aiLoading.value = null
+}
+
 async function quickBlacklist(d) {
   if (alertStore.accessListMode !== 'blacklist') { ElMessage.warning('请先在黑名单页面开启黑名单模式'); return }
   try { await alertStore.addToBlacklist({ mac: d.mac, name: d.mac, reason: '拓扑添加' }) } catch {}
@@ -976,6 +1009,8 @@ onUnmounted(() => {
 .signal-ring {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   border: 2px solid rgba(0,255,136,0.2); border-radius: 50%; pointer-events: none;
+  opacity: 0;
+  animation-fill-mode: both;
 }
 .ring-1 { width: 120px; height: 120px; animation: ring-out 3s ease-out infinite; }
 .ring-2 { width: 120px; height: 120px; animation: ring-out 3s ease-out 0.75s infinite; }
@@ -1175,6 +1210,7 @@ onUnmounted(() => {
 .adc-row .mono { font-size: 11px; color: #cc9999; text-align: right; word-break: break-all; }
 .adc-suggestion { font-size: 12px; color: #ddaaaa; line-height: 1.5; text-align: right; flex: 1; }
 .adc-actions { display: flex; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.04); }
+.adc-ai-result { margin-top: 8px; padding: 8px 10px; background: rgba(255,200,50,0.08); border: 1px solid rgba(255,200,50,0.2); border-radius: 6px; font-size: 12px; color: #ccaa55; line-height: 1.6; }
 
 .mono { font-family: monospace; font-size: 11px; }
 

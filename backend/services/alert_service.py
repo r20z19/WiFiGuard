@@ -1,6 +1,7 @@
 from database import get_db
 from utils.time_utils import now_str
 from services.log_service import add_log
+from services.frame_service import log_attack_event
 
 
 def get_current_alerts():
@@ -56,6 +57,13 @@ def create_alert(alert_data):
     conn.commit()
     alert_id = cursor.lastrowid
     conn.close()
+    # Log to event buffer for AI analysis
+    log_attack_event(
+        alert_data["type"],
+        alert_data.get("sourceMac", alert_data.get("source_mac", "")),
+        alert_data.get("targetMac", alert_data.get("target_mac", "")),
+        alert_data.get("severity", "medium"),
+    )
     # Log the attack detection
     severity = alert_data.get("severity", "medium")
     log_level = "ERROR" if severity in ("critical", "high") else "WARNING"

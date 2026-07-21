@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS system_logs (
     message TEXT NOT NULL,
     detail TEXT DEFAULT ''
 );
+
+CREATE TABLE IF NOT EXISTS ai_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    provider TEXT NOT NULL DEFAULT 'deepseek',
+    api_key TEXT NOT NULL DEFAULT '',
+    enabled INTEGER DEFAULT 0
+);
 """
 
 
@@ -120,6 +127,9 @@ def init_db():
             pass
     conn.execute(
         "INSERT OR IGNORE INTO email_config (id) VALUES (1)"
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO ai_config (id, provider) VALUES (1, 'deepseek')"
     )
     _init_default_user(conn)
     conn.commit()

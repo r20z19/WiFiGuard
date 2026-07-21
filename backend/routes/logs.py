@@ -37,8 +37,13 @@ def export():
         )
 
     csv = "\n".join(rows)
+    # Add UTF-8 BOM so Excel can recognize the encoding
+    csv_bytes = ("﻿" + csv).encode("utf-8")
     return Response(
-        csv,
-        mimetype="text/csv",
-        headers={"Content-Disposition": "attachment; filename=wifiguard-logs.csv"},
+        csv_bytes,
+        mimetype="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": "attachment; filename=wifiguard-logs.csv",
+            "Content-Type": "text/csv; charset=utf-8",
+        },
     )

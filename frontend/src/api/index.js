@@ -83,4 +83,13 @@ export const getLogs = (params) => api.get('/logs', { params })
 export const getLogStats = () => api.get('/logs/stats')
 export const exportLogs = (params) => api.get('/logs/export', { params, responseType: 'blob' })
 
+export const getAiConfig = () => api.get('/ai/config')
+export const saveAiConfig = (data) => api.post('/ai/config', data)
+export const interpretAlert = (alert) => api.post('/ai/interpret', alert)
+export const chatAi = (data) => api.post('/ai/chat', data)
+export const generateAiReport = (data) => api.post('/ai/report', data)
+export const identifyDevice = (data) => api.post('/ai/identify', data)
+export const detectAnomalies = (data) => api.post('/ai/anomalies', data)
+export const predictThreats = (data) => api.post('/ai/predict', data)
+
 export default api

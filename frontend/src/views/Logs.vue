@@ -94,7 +94,9 @@ async function exportLog() {
     if (categoryFilter.value) params.category = categoryFilter.value
     if (searchQuery.value) params.search = searchQuery.value
     const resp = await api.get('/logs/export', { params, responseType: 'blob' })
-    const url = URL.createObjectURL(new Blob([resp.data]))
+    // Axios interceptor returns response.data; for blob it IS the Blob
+    const blob = resp instanceof Blob ? resp : new Blob([resp], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'wifiguard-logs.csv'; a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
