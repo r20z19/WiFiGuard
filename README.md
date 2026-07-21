@@ -1,249 +1,177 @@
-# WiFiGuard 前端系统
+# WiFiGuard
 
-智能无线入侵检测与预警系统 - Web可视化管理与告警平台
+<p align="center">
+  <strong>智能无线网络安全防护与入侵检测系统</strong>
+</p>
+
+<p align="center">
+  集 <strong>实时监控 · 入侵检测 · 主动防御 · 可视化拓扑 · AI 智能分析 · 邮件告警</strong> 于一体
+</p>
+
+---
 
 ## 技术栈
 
-- Vue 3 - 渐进式JavaScript框架
-- Vite - 下一代前端构建工具
-- Element Plus - Vue 3 UI组件库
-- Pinia - Vue状态管理
-- Vue Router - Vue路由管理
-- Axios - HTTP客户端
+| 层级 | 技术 |
+|------|------|
+| 前端框架 | Vue 3 (Composition API) + Vite 5 |
+| UI 组件 | Element Plus 2.x |
+| 图表 | ECharts 5 |
+| 状态管理 | Pinia |
+| 路由 | Vue Router 4 |
+| HTTP | Axios |
+| 后端 | Python Flask + Scapy |
+| 数据库 | SQLite (WAL 模式) |
+| AI | DeepSeek / 通义千问 / 智谱 GLM |
+
+---
 
 ## 项目结构
 
 ```
-frontend/
-├── src/
-│   ├── api/              # API接口
-│   │   └── index.js
-│   ├── assets/           # 静态资源
-│   │   └── global.css
-│   ├── components/       # 组件
-│   ├── router/           # 路由配置
-│   │   └── index.js
-│   ├── store/            # 状态管理
-│   │   └── alert.js
-│   ├── views/            # 页面
-│   │   ├── Dashboard.vue    # 系统概览
-│   │   ├── Alerts.vue       # 当前告警
-│   │   ├── History.vue      # 历史告警
-│   │   ├── Devices.vue      # 在线设备
-│   │   ├── Whitelist.vue    # 设备白名单
-│   │   ├── Blacklist.vue    # 设备黑名单
-│   │   └── Email.vue        # 邮箱推送
-│   ├── App.vue           # 根组件
-│   └── main.js           # 入口文件
-├── index.html
-├── vite.config.js
-└── package.json
+WiFiGuard/
+├── frontend/                  # Vue 3 前端
+│   ├── src/
+│   │   ├── api/index.js       # API 接口层
+│   │   ├── assets/            # 静态资源 (CSS, JSON)
+│   │   ├── components/        # 公共组件
+│   │   │   └── AiPanel.vue    # AI 聊天浮动面板
+│   │   ├── router/index.js    # 路由配置
+│   │   ├── store/             # Pinia 状态管理
+│   │   ├── views/             # 页面组件
+│   │   │   ├── Dashboard.vue  # 系统概览
+│   │   │   ├── Alerts.vue     # 当前告警
+│   │   │   ├── History.vue    # 历史告警
+│   │   │   ├── Devices.vue    # 在线设备
+│   │   │   ├── Whitelist.vue  # 设备白名单
+│   │   │   ├── Blacklist.vue  # 设备黑名单
+│   │   │   ├── Email.vue      # 邮箱推送
+│   │   │   ├── NetworkMap.vue # 网络拓扑
+│   │   │   ├── Logs.vue       # 系统日志
+│   │   │   ├── Report.vue     # 安全报告
+│   │   │   ├── AiSettings.vue # AI 功能配置
+│   │   │   └── Login.vue      # 登录页
+│   │   ├── App.vue            # 根组件
+│   │   └── main.js            # 入口文件
+│   ├── index.html
+│   ├── vite.config.js
+│   └── package.json
+├── backend/                   # Python Flask 后端
+│   ├── app.py                 # 主入口
+│   ├── database.py            # 数据库初始化
+│   ├── config.py              # 配置文件
+│   ├── routes/                # API 路由 (11个模块)
+│   ├── services/              # 业务逻辑层
+│   ├── detection/             # 8 个检测引擎
+│   ├── utils/                 # 工具函数
+│   └── scripts/               # 辅助脚本
+└── 项目介绍.md                # 用户手册
 ```
+
+---
 
 ## 功能模块
 
-### 1. 系统概览 (Dashboard)
-- 系统状态显示：正在初始化 / 监听中
-- 当前告警数量统计
-- 在线设备数量统计
-- 历史告警数量统计
-- 快速安全建议展示
-- 快捷配置入口
+### 系统概览 (Dashboard)
+- 4 张状态卡片（系统状态 / 告警 / 设备 / 今日告警），全部可点击跳转
+- 攻击类型统计柱状图 + 占比饼图（点击扇区可筛选告警）
+- 安全建议卡片（紧急处置 / 攻击防御 / 配置引导），每条带操作按钮
+- 在线设备快速浏览列表
+- 2D 仪表盘 / 网络拓扑 一键切换
 
-### 2. 当前告警 (Alerts)
-- 实时告警列表
-- 攻击类型分类（Deauth攻击、钓鱼AP、暴力破解等7类）
-- 严重等级标识（严重/高危/中危/低危）
-- 安全建议详情
-- 告警处理功能
+### 当前告警 (Alerts)
+- 实时告警列表 + 严重等级快速筛选（全部/严重/高危/中危）
+- 攻击源聚合视图（按 MAC 合并显示攻击次数和类型）
+- 批量操作：多选 → 批量清除 / 批量加黑名单
+- 一键处置：拉黑源 MAC + 清除告警
+- AI 智能解读 + 报文上下文分析
+- 右侧详情面板（点"建议"展开）
 
-### 3. 历史告警 (History)
-- 历史告警记录查询
-- 日期范围筛选
-- 攻击类型筛选
-- 处理状态筛选
-- 告警详情查看
+### 历史告警 (History)
+- 日期快捷筛选（今天 / 本周 / 本月）+ 日期范围选择器
+- 攻击类型 + 状态筛选
+- 统计摘要栏（严重/高危/中危/低危计数）
+- 📥 导出 CSV
 
-### 4. 在线设备 (Devices)
-- 实时在线设备列表
-- MAC地址、IP地址、SSID显示
-- 信号强度可视化
-- 设备状态标识（正常/可疑）
-- 快速加入白名单/黑名单
+### 在线设备 (Devices)
+- 实时在线设备列表 + 厂商 OUI 自动识别 + 设备类型图标
+- 信号强度可视化 + 风险评估评分（0-100）
+- 在线时长显示 + 设备指纹标签（新设备/常驻/信号异常）
+- 侧滑详情抽屉：设备标识 + 网络信息 + 安全评估 + 行为时间线
+- AI 智能设备识别
 
-### 5. 设备白名单 (Whitelist)
-- 白名单设备管理
-- 添加/编辑/移除设备
-- MAC地址和设备名称配置
+### 网络拓扑 (NetworkMap)
+- 室内房间平面图 + 家具布局 + 信号区域环（优/良/中/弱）
+- AP 居中持续扩散信号波纹 + 用户设备按信号强度分布
+- 攻击者红色闪烁 + 攻击连线动态虚线 + 彩色箭头
+- 设备状态徽章（攻击中 / 被攻击 / 已踢出）+ 攻击次数角标
+- 左侧设备列表 + 右侧详情面板 + 悬停信息卡
 
-### 6. 设备黑名单 (Blacklist)
-- 黑名单设备管理
-- 添加/编辑/移除设备
-- 加入原因记录
+### 白名单 / 黑名单
+- 启用开关（互斥，同一时间只能启用一种）
+- 从在线设备批量导入 + 手动添加/编辑/移除
+- MAC 自动格式化（大写 + 冒号分隔）
+- 实时显示名单设备在线状态
+- 黑名单关联告警统计
 
-### 7. 邮箱推送 (Email)
-- SMTP服务器配置
-- 邮箱授权码配置
-- 收件邮箱配置
-- 推送开关控制
-- 连接测试功能
+### 邮箱推送 (Email)
+- SMTP 配置（QQ / 163 / Gmail） + 授权码
+- 测试连接 + 保存配置
 - 推送记录查看
-- 主流邮箱配置指南（QQ/163/Gmail）
+- 内置配置指南
 
-## 安装和运行
+### 安全报告 (Report)
+- 综合安全评分（0-100 环形图）
+- 安全趋势折线图 + 攻击类型饼图
+- 高危设备列表
+- 🤖 AI 自动生成安全报告
+- 🔍 AI 异常行为检测 + 🔮 AI 攻击预测
 
-### 环境要求
-- Node.js >= 16.0.0
-- npm >= 8.0.0
+### 系统日志 (Logs)
+- 等级筛选（ERROR / WARNING / INFO）+ 类别筛选
+- 关键词搜索
+- 📥 导出 CSV
+- 自动记录：攻击检测 / 名单变更 / 设备踢出 / 邮件发送 / 系统启动
 
-### 安装依赖
+### AI 功能 (AiSettings)
+- 支持平台：DeepSeek / 通义千问 / 智谱 GLM
+- API Key 配置 + 测试连接
+- 功能：智能告警解读 / AI 安全顾问 / 自动报告 / 设备识别 / 异常检测 / 攻击预测
+- 右下角浮动聊天面板（AI 安全顾问）
 
-#### Ubuntu / Debian
+---
 
-```bash
-# 基础工具
-sudo apt update
-sudo apt install -y git curl
+## 快速开始
 
-# 无线攻击演示工具（仅运行攻击脚本时需要）
-sudo apt install -y aircrack-ng   # aireplay-ng, airodump-ng, aircrack-ng
-sudo apt install -y hostapd        # 伪造 AP
-sudo apt install -y mdk4           # MDK4 泛洪攻击工具
-sudo apt install -y macchanger     # MAC 地址欺骗
-```
-
-#### Arch Linux
-
-```bash
-sudo pacman -S aircrack-ng hostapd mdk4 macchanger
-```
-
-#### Raspberry Pi (Raspberry Pi OS)
+### 5 分钟体验（模拟模式，无需网卡）
 
 ```bash
-sudo apt update
-sudo apt install -y aircrack-ng hostapd mdk4 macchanger
-# 注意：部分包名可能与 Ubuntu 不同，以 apt search 为准
-```
-
-### 2. 配置监听网卡
-
-攻击检测需要一个支持 **monitor 模式** 的无线网卡（USB 外接或内置）。
-
-```bash
-# 查看无线网卡
-iwconfig
-# 找到你的 USB 无线网卡，通常是 wlan1、wlp0s20f0u1 等
-
-# 使用项目自带的脚本一键切换（推荐）
-sudo ./backend/scripts/setup_monitor.sh <网卡接口名>
-
-# 或手动切换
-sudo ip link set <网卡接口名> down
-sudo iw dev <网卡接口名> set type monitor
-sudo ip link set <网卡接口名> up
-
-# 确认 monitor 模式已启用
-iw dev <网卡接口名> info | grep type
-# 应该显示 type monitor
-```
-
-**注意**：`setup_monitor.sh` 使用 `iw` 命令，不会重命名网卡。如果习惯使用 `airmon-ng`，它会把网卡重命名为 `wlan1mon`，此时需将 `WIFIGUARD_IFACE` 设置为 `wlan1mon`。
-
-### 3. 安装 Python 环境
-
-```bash
-# 安装 miniconda（如未安装）
-# https://docs.conda.io/en/latest/miniconda.html
-
-# 创建 Python 3.11 虚拟环境
-conda create -n wifiguard python=3.11 -y
-conda activate wifiguard
-```
-
-### 4. 安装后端依赖
-
-```bash
+# 1. 安装后端依赖
 cd backend
 pip install -r requirements.txt
-```
 
-### 5. 安装前端依赖
-
-```bash
-cd frontend
+# 2. 安装前端并构建
+cd ../frontend
 npm install
-```
-
-### 开发模式
-
-```bash
-npm run dev
-```
-
-访问 http://localhost:3000
-
-### 生产构建
-
-```bash
 npm run build
+
+# 3. 启动
+cd ../backend
+python app.py
 ```
 
-### 预览构建结果
+浏览器打开 **http://localhost:8000**，默认账户 `admin / admin`。
+
+### 真实监听模式（需要 Monitor 网卡）
 
 ```bash
-npm run preview
-```
-
-### 6. 用户认证
-
-**默认凭据：**
-
-| 字段 | 值 |
-|------|------|
-| 用户名 | `admin` |
-| 初始密码 | `123123` |
-
-首次登录成功后，系统会弹出修改密码对话框，请及时修改默认密码。
-
-每次访问系统时，都需要先登录认证，未登录用户会被自动重定向到登录页面。
-
-## 运行模式
-
-### 模拟模式（默认）
-
-`SIMULATION_MODE=true`（默认），不需要监听网卡。后端内置的 `SimulatorDataGenerator` 会自动：
-- 生成 8 台虚拟在线设备
-- 按时间线注入 7 种攻击告警（Deauth、Evil Twin、Flood 等）
-- 适用于开发调试和功能演示
-
-### 监听网卡模式（Live 实时监测）
-
-连接真实监听网卡后，系统通过 tshark 实时抓取 802.11 帧，送入 7 个检测器进行攻击识别。
-
-```bash
-# 1. 将网卡切换为 monitor 模式
-sudo ./backend/scripts/setup_monitor.sh <网卡接口名>
-
-# 2. 设置环境变量并启动后端
+sudo ./backend/scripts/setup_monitor.sh wlan1
 export WIFIGUARD_SIM=false
-export WIFIGUARD_IFACE=<网卡接口名>   # 与上一步一致
+export WIFIGUARD_IFACE=wlan1
 cd backend && python app.py
 ```
 
-工作流程：
-1. `LivePacketCapture` 后台运行 `tshark -i <接口>`，持续抓取 802.11 帧
-2. daemon 线程解析帧并放入线程安全队列
-3. 检测引擎每 2 秒排空队列，将帧批量送入 7 个检测器
-4. 检测器通过滑动时间窗口分析帧数据，超过阈值时产生告警
-
-### Pcap 重放模式
-
-从预录制的 pcap 文件中读取帧进行离线检测，适合回放历史数据或调试：
-
-```bash
-WIFIGUARD_SIM=false WIFIGUARD_PCAP=test/testcase/global-01.cap python app.py
-```
+---
 
 ## 环境变量
 
@@ -251,45 +179,57 @@ WIFIGUARD_SIM=false WIFIGUARD_PCAP=test/testcase/global-01.cap python app.py
 |------|--------|------|
 | `WIFIGUARD_DB` | `backend/data/wifiguard.db` | SQLite 数据库路径 |
 | `WIFIGUARD_IFACE` | `wlan1mon` | 监听网卡接口名 |
-| `WIFIGUARD_SIM` | `true` | 模拟模式（`true`=无需网卡，`false`=真实监听） |
-| `WIFIGUARD_PCAP` | (空) | Pcap 文件路径（逗号分隔多个），设置后优先于模拟/监听模式 |
-| `WIFIGUARD_INTERVAL` | `2` | 检测引擎轮询间隔（秒） |
-| `WIFIGUARD_SMTP_HOST` | `smtp.qq.com` | 邮件 SMTP 服务器 |
-| `WIFIGUARD_SMTP_PORT` | `465` | SMTP 端口 |
+| `WIFIGUARD_SIM` | `true` | 模拟模式开关 |
+| `WIFIGUARD_PCAP` | (空) | PCAP 文件路径 |
+| `WIFIGUARD_INTERVAL` | `2` | 检测轮询间隔（秒） |
+| `WIFIGUARD_DEBUG` | `false` | Flask 调试模式 |
 
-## 攻击演示脚本
+---
 
-这些脚本用于在真实网络环境中测试检测系统，**需要 root 权限和 monitor 模式网卡**。
+## API 接口
 
-所有攻击脚本**必须手动指定目标**，不会自动选择目标，避免误伤他人网络。
+| 接口 | 方法 | 说明 |
+|------|:--:|------|
+| `/api/system/status` | GET | 系统状态 |
+| `/api/alerts/current` | GET | 当前告警 |
+| `/api/alerts/history` | GET | 历史告警 |
+| `/api/alerts/<id>/clear` | POST | 清除告警 |
+| `/api/devices/online` | GET | 在线设备 |
+| `/api/devices/whitelist` | GET/POST | 白名单管理 |
+| `/api/devices/whitelist/<mac>` | DELETE | 移出白名单 |
+| `/api/devices/blacklist` | GET/POST | 黑名单管理 |
+| `/api/devices/blacklist/<mac>` | DELETE | 移出黑名单 |
+| `/api/email/config` | GET/PUT | 邮箱配置 |
+| `/api/email/test` | POST | 测试邮箱连接 |
+| `/api/email/records` | GET | 推送记录 |
+| `/api/auth/login` | POST | 登录 |
+| `/api/auth/change-password` | POST | 修改密码 |
+| `/api/geo/locations` | GET | 设备地理位置 |
+| `/api/logs` | GET | 系统日志 |
+| `/api/logs/stats` | GET | 日志统计 |
+| `/api/logs/export` | GET | 导出日志CSV |
+| `/api/ai/config` | GET/POST | AI 配置 |
+| `/api/ai/interpret` | POST | AI 告警解读 |
+| `/api/ai/chat` | POST | AI 对话 |
+| `/api/ai/report` | POST | AI 生成报告 |
+| `/api/ai/identify` | POST | AI 设备识别 |
+| `/api/ai/anomalies` | POST | AI 异常检测 |
+| `/api/ai/predict` | POST | AI 攻击预测 |
+| `/api/ai/frames` | GET | 报文上下文查询 |
 
-### 第一步：扫描
+---
 
-```bash
-npm run preview
-```
+## 默认账户
 
-## API接口说明
+| 字段 | 值 |
+|------|------|
+| 用户名 | `admin` |
+| 初始密码 | `admin` |
 
-前端通过 `/api` 路径代理访问后端API，后端服务默认运行在 `http://localhost:8000`。
+首次登录需修改密码。忘记密码：删除 `backend/data/wifiguard.db` 重启即可重置。
 
-主要接口：
-- `GET /api/system/status` - 获取系统状态
-- `GET /api/alerts/current` - 获取当前告警
-- `GET /api/alerts/history` - 获取历史告警
-- `GET /api/devices/online` - 获取在线设备
-- `GET /api/devices/whitelist` - 获取白名单
-- `POST /api/devices/whitelist` - 添加到白名单
-- `DELETE /api/devices/whitelist/:mac` - 从白名单移除
-- `GET /api/devices/blacklist` - 获取黑名单
-- `POST /api/devices/blacklist` - 添加到黑名单
-- `DELETE /api/devices/blacklist/:mac` - 从黑名单移除
-- `GET /api/email/config` - 获取邮箱配置
-- `PUT /api/email/config` - 更新邮箱配置
-- `POST /api/email/test` - 测试邮箱连接
+---
 
-## 注意事项
+## 许可证
 
-1. 当前版本使用模拟数据进行演示，实际使用时需要连接后端API
-2. 邮箱配置中的授权码不是邮箱密码，需要在邮箱设置中生成
-3. 建议在封闭测试环境中进行攻击模拟测试
+本项目仅限**教育、研究和个人使用**。不得用于任何未经授权的网络攻击或非法活动。
