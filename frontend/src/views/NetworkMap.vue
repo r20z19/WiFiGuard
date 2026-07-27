@@ -93,9 +93,9 @@
         <svg class="lines-layer" :key="'svg-'+roomVersion">
           <line v-for="conn in connections" :key="conn.mac"
             :x1="apX" :y1="apY" :x2="conn.x" :y2="conn.y"
-            :stroke="getDisplayColor(conn.colors) ? getDisplayColor(conn.colors) + '88' : '#4488ff22'"
-            :stroke-width="conn.colors.length > 0 ? 2 : 1"
-            :stroke-dasharray="conn.colors.length > 0 ? '8,4' : '10,6'"
+            :stroke="getDisplayColor(conn.colors) ? getDisplayColor(conn.colors) + '88' : '#4488ff55'"
+            :stroke-width="conn.colors.length > 0 ? 2 : 1.2"
+            :stroke-dasharray="conn.colors.length > 0 ? '8,4' : '8,4'"
             :class="['conn-line', conn.cls]"
           />
           <!-- AP↔device arrows at 1/3 position -->
@@ -145,9 +145,9 @@
             <span class="wd-sub">{{ apDevice?.pairwiseCipher || 'WPA2' }} 加密</span>
           </div>
           <div class="wall-display wd-bottom">
-            <span class="wd-icon">⏱</span>
+            <span class="wd-icon"><span class="wd-clock"></span></span>
             <span class="wd-text">实时监控中</span>
-            <span class="wd-sub">{{ new Date().toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'}) }}</span>
+            <span class="wd-sub">{{ new Date().toLocaleString('zh-CN', {year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}) }}</span>
           </div>
 
           <!-- Floor with grid + signal zones -->
@@ -187,7 +187,7 @@
           <div class="furn rug"></div>
 
           <!-- AP Center -->
-          <div class="ap-center" :class="{ 'ap-alert': activeAlerts.length > 0 }">
+          <div class="ap-center">
             <div class="ap-icon-wrap">
               <img :src="iconImgs.router" class="ap-icon-img" />
             </div>
@@ -200,42 +200,22 @@
           </div>
         </div>
 
-        <!-- Device cards -->
+        <!-- Device icons -->
         <div
           v-for="dev in positionedDevices" :key="dev.mac + '-' + roomVersion"
           class="device-card"
           :class="[
-            dev._dtype === 'attacker' ? 'card-attacker' : '',
-            attacksForDevice(dev.mac).length > 0 && dev._dtype !== 'attacker' ? 'card-target' : '',
             selectedMac === dev.mac ? 'card-selected' : '',
-            attacksForDevice(dev.mac).length > 0 && dev._dtype !== 'attacker' ? 'card-under-attack' : '',
+            deviceStatusClass(dev),
           ]"
           :style="{ left: dev._x + 'px', top: dev._y + 'px' }"
           @click.stop="selectDevice(dev)"
           @mouseenter="hoverDevice(dev, $event)"
+          @mousemove="hoverMove($event)"
           @mouseleave="hoveredMac = null"
         >
-          <!-- Attack flash + status badges + count -->
-          <div v-if="dev._dtype === 'attacker'" class="attack-flash"></div>
-          <div
-            v-for="(st, si) in getDeviceStatuses(dev)"
-            :key="si"
-            class="device-status-badge"
-            :class="st.cls"
-            :style="{ top: (-10 - si * 22) + 'px' }"
-          >{{ st.text }}</div>
-          <div
-            v-if="attacksForDevice(dev.mac).length > 0"
-            class="attack-count-badge"
-          >{{ attacksForDevice(dev.mac).length }}</div>
           <img :src="getIconUrl(dev._dtype)" class="card-icon" />
-          <div class="card-name">{{ getTypeName(dev._dtype) }}</div>
           <div class="card-mac">{{ dev.mac?.slice(-8) }}</div>
-          <div class="card-signal">
-            <span v-for="b in signalBars(dev.signal)" :key="b" class="sig-bar" :class="'bar-'+b"></span>
-            <span class="sig-dbm">{{ dev.signal }}</span>
-          </div>
-          <div class="card-dist">≈ {{ calcDistance(dev).text }}</div>
         </div>
 
         <!-- Attackers outside -->
@@ -271,11 +251,8 @@
 
         </div><!-- end room-zoom-layer -->
 
-        <!-- Hover tooltip (outside zoom layer) -->
-        <div v-if="hoveredMac && hoveredDevice"
-          class="hover-card"
-          :style="{ left: hoverX + 14 + 'px', top: hoverY - 14 + 'px' }"
-        >
+        <!-- Hover tooltip (fixed bottom-right) -->
+        <div v-if="hoveredMac && hoveredDevice" class="hover-card">
           <div class="hc-head">
             <img :src="getIconUrl(hoveredDevice._dtype)" class="hc-icon" />
             <span>{{ getTypeName(hoveredDevice._dtype) }}</span>
@@ -456,7 +433,7 @@ const apX = ref(0); const apY = ref(0)
 const ROOM_W = ref(800); const ROOM_H = ref(500)
 const AP_X = ref(400); const AP_Y = ref(250)
 const roomVersion = ref(0)
-const ROOM_PAD = 30
+const ROOM_PAD = 25
 let roomResizeObs = null
 
 function updateRoomSize() {
@@ -478,6 +455,15 @@ const deviceTypeCounts = computed(() => ({
   phone: devices.value.filter(d => d._dtype === 'phone').length,
   attacker: devices.value.filter(d => d._dtype === 'attacker').length,
 }))
+
+// Device status color class
+function deviceStatusClass(dev) {
+  const asSource = activeAlerts.value.some(a => a.sourceMac === dev.mac)
+  const asTarget = activeAlerts.value.some(a => a.targetMac === dev.mac)
+  if (asSource) return 'dev-attacking'
+  if (asTarget) return 'dev-targeted'
+  return 'dev-normal'
+}
 
 // Attacks targeting each device
 function attacksForDevice(mac) {
@@ -590,8 +576,8 @@ function getDeviceStatuses(dev) {
 const CARD_W = 155; const CARD_H = 100
 // Inner rings (excellent/good signal) larger → more room for devices
 // Outer rings (medium/poor) compressed → overall tighter, more orderly
-// 8 rings with safe margins from walls
-const ringRatios = [0.08, 0.20, 0.32, 0.44, 0.56, 0.68, 0.78, 0.88]
+// 6 rings wider spaced, safe from walls
+const ringRatios = [0.14, 0.28, 0.42, 0.56, 0.70, 0.84]
 
 function calcRingPositions(devs) {
   const n = devs.length
@@ -602,7 +588,7 @@ function calcRingPositions(devs) {
   // Map signal range to all rings proportionally (use full room width)
   // Signal -30 → ring 0 (6%), Signal -90 → ring 9 (96%)
   // Each ring has a capacity; if overflow, push to next outer ring (never inward)
-  const CARD_GAP = 115
+  const CARD_GAP = 85
   const capacities = ringRatios.map(r => Math.max(1, Math.floor((2 * Math.PI * maxR * r) / CARD_GAP)))
   const ringCounts = ringRatios.map(() => 0)
   const deviceRings = new Array(n).fill(0)
@@ -652,8 +638,8 @@ function calcRingPositions(devs) {
     ringAngles[ri]++
     results.push({
       device: sorted[i],
-      x: AP_X.value + Math.cos(angle) * r - 50,
-      y: AP_Y.value + Math.sin(angle) * r - 40,
+      x: AP_X.value + Math.cos(angle) * r - 30,
+      y: AP_Y.value + Math.sin(angle) * r - 30,
     })
   }
   return results
@@ -676,7 +662,7 @@ const positionedAttackers = computed(() => {
     const idxInRow = Math.floor(i / 2)
     const x = 80 + (ROOM_W.value - 160) * ((idxInRow + 0.5) / perRow)
     const y = side === 0 ? -40 : ROOM_H.value + 10
-    return { ...d, _x: x - 50, _y: y }
+    return { ...d, _x: x - 39, _y: y }
   })
 })
 
@@ -729,7 +715,7 @@ const connections = computed(() => {
     if (tgtAlerts.length > 0 && srcAlerts.length === 0) direction = 'toDevice'
     if (srcAlerts.length > 0) direction = 'toAP'
     return {
-      mac: d.mac, x: d._x + 50, y: d._y + 40,
+      mac: d.mac, x: d._x + 30, y: d._y + 30,
       colors: getConnectionColors(d.mac),
       cls: getConnectionClass(d.mac),
       direction,
@@ -764,9 +750,9 @@ function calcArrowAt(x1, y1, x2, y2, fraction) {
 // Find victim device position (may be in users or attackers list)
 function findDevicePos(mac) {
   const dev = positionedDevices.value.find(d => d.mac === mac)
-  if (dev) return { x: dev._x + 50, y: dev._y + 40 }
+  if (dev) return { x: dev._x + 30, y: dev._y + 30 }
   const atk = positionedAttackers.value.find(d => d.mac === mac)
-  if (atk) return { x: atk._x + 45, y: atk._y + 25 }
+  if (atk) return { x: atk._x + 39, y: atk._y + 22 }
   return null
 }
 
@@ -779,7 +765,7 @@ const attackLines = computed(() => {
     seen.add(a.sourceMac)
     const victimPos = findDevicePos(a.targetMac)
     lines.push({
-      x1: src._x + 45, y1: src._y + 25,
+      x1: src._x + 39, y1: src._y + 22,
       x2: victimPos ? victimPos.x : AP_X.value,
       y2: victimPos ? victimPos.y : AP_Y.value,
       attacker: src,
@@ -796,6 +782,7 @@ function selectDevice(dev) {
   else { selectedMac.value = dev.mac; detailDevice.value = dev }
 }
 function hoverDevice(dev, ev) { hoveredMac.value = dev.mac; hoveredDevice.value = dev; hoverX.value = ev.clientX; hoverY.value = ev.clientY }
+function hoverMove(ev) { hoverX.value = ev.clientX; hoverY.value = ev.clientY }
 async function aiInterpretAttack(alert) {
   // Toggle collapse if already shown
   if (aiResults.value.has(alert.id)) {
@@ -999,14 +986,28 @@ onUnmounted(() => {
 
 /* Wall displays */
 .wall-display {
-  position: absolute; z-index: 3;
-  background: rgba(0,0,0,0.4); border: 1px solid rgba(68,136,255,0.15);
+  position: absolute; z-index: 22;
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(68,136,255,0.2);
   border-radius: 8px; padding: 8px 14px;
   display: flex; flex-direction: column; align-items: center;
 }
 .wd-top { top: 18px; left: 50%; transform: translateX(-50%); }
-.wd-bottom { bottom: 18px; left: 50%; transform: translateX(-50%); }
-.wd-icon { font-size: 18px; }
+.wd-bottom { bottom: 18px; left: 24px; }
+.wd-icon { font-size: 18px; color: #5599dd; }
+.wd-clock {
+  display: inline-block; width: 16px; height: 16px;
+  border: 2px solid #5599dd; border-radius: 50%; position: relative;
+}
+.wd-clock::before {
+  content: ''; position: absolute; bottom: 50%; left: 50%;
+  width: 2px; height: 6px; background: #5599dd; border-radius: 1px;
+  transform-origin: bottom center; transform: translateX(-50%) rotate(0deg);
+}
+.wd-clock::after {
+  content: ''; position: absolute; bottom: 50%; left: 50%;
+  width: 2px; height: 4px; background: #88bbee; border-radius: 1px;
+  transform-origin: bottom center; transform: translateX(-50%) rotate(90deg);
+}
 .wd-text { font-size: 13px; font-weight: 600; color: #aabbcc; margin-top: 2px; }
 .wd-sub { font-size: 10px; color: #667788; margin-top: 1px; }
 
@@ -1084,74 +1085,50 @@ onUnmounted(() => {
   z-index: 15; text-align: center;
 }
 .ap-icon-wrap {
-  width: 80px; height: 80px; margin: 0 auto;
-  background: rgba(0,255,136,0.06); border: 3px solid rgba(0,255,136,0.35);
+  width: 70px; height: 70px; margin: 0 auto;
   border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  animation: ap-glow 2s ease-in-out infinite;
 }
-@keyframes ap-glow {
-  0%,100% { box-shadow: 0 0 20px rgba(0,255,136,0.12), 0 0 40px rgba(0,255,136,0.06); }
-  50% { box-shadow: 0 0 40px rgba(0,255,136,0.35), 0 0 80px rgba(0,255,136,0.15); }
+.ap-icon-img { width: 56px; height: 56px; }
+.signal-ring {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  border: 1.5px solid rgba(0,255,136,0.12); border-radius: 50%; pointer-events: none;
 }
-.ap-center.ap-alert .ap-icon-wrap {
-  border-color: rgba(255,68,68,0.45); background: rgba(255,68,68,0.05);
-  animation: ap-alert-glow 1s ease-in-out infinite;
+.ring-1 { width: 100px; height: 100px; animation: ring-out 3s ease-out infinite; }
+.ring-2 { width: 100px; height: 100px; animation: ring-out 3s ease-out 0.75s infinite; }
+.ring-3 { width: 100px; height: 100px; animation: ring-out 3s ease-out 1.5s infinite; }
+.ring-4 { width: 100px; height: 100px; animation: ring-out 3s ease-out 2.25s infinite; }
+@keyframes ring-out {
+  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0.6; }
+  100% { transform: translate(-50%, -50%) scale(5); opacity: 0; }
 }
-@keyframes ap-alert-glow {
-  0%,100% { box-shadow: 0 0 20px rgba(255,68,68,0.2), 0 0 40px rgba(255,68,68,0.08); }
-  50% { box-shadow: 0 0 40px rgba(255,68,68,0.5), 0 0 80px rgba(255,68,68,0.25); }
-}
-.ap-icon-img { width: 46px; height: 46px; }
 .ap-label { margin-top: 6px; font-size: 13px; font-weight: 700; color: #dde8f0; }
 .ap-mac { font-size: 10px; color: #667788; font-family: monospace; margin-top: 1px; }
 .ap-ssid { font-size: 10px; color: #4488aa; margin-top: 1px; font-weight: 500; }
 
 /* Signal rings */
-.signal-ring {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  border: 2px solid rgba(0,255,136,0.2); border-radius: 50%; pointer-events: none;
-  opacity: 0;
-  animation-fill-mode: both;
-}
-.ring-1 { width: 120px; height: 120px; animation: ring-out 3s ease-out infinite; }
-.ring-2 { width: 120px; height: 120px; animation: ring-out 3s ease-out 0.75s infinite; }
-.ring-3 { width: 120px; height: 120px; animation: ring-out 3s ease-out 1.5s infinite; }
-.ring-4 { width: 120px; height: 120px; animation: ring-out 3s ease-out 2.25s infinite; }
-@keyframes ring-out {
-  0% { transform: translate(-50%, -50%) scale(0.4); opacity: 0.8; }
-  100% { transform: translate(-50%, -50%) scale(6); opacity: 0; }
-}
 
 /* ====== DEVICE CARDS ====== */
 .device-card {
   position: absolute; z-index: 8;
-  width: 100px; background: rgba(20,28,44,0.94);
-  border: 1px solid rgba(68,136,255,0.25); border-radius: 10px;
-  padding: 6px 5px; text-align: center; cursor: pointer;
-  transition: all 0.2s; backdrop-filter: blur(4px);
+  width: 60px; text-align: center; cursor: pointer;
+  transition: all 0.2s; filter: drop-shadow(0 0 3px transparent);
 }
-.device-card:hover {
-  border-color: rgba(68,136,255,0.7); transform: translateY(-3px) scale(1.06);
-  box-shadow: 0 6px 22px rgba(68,136,255,0.3); z-index: 25;
+.dev-normal .card-icon { filter: drop-shadow(0 0 8px rgba(0,255,136,0.7)); }
+.dev-targeted .card-icon { filter: drop-shadow(0 0 8px rgba(255,0,0,0.7)); animation: icon-red-blink 1s ease-in-out infinite; }
+.dev-attacking .card-icon { filter: drop-shadow(0 0 8px rgba(255,200,0,0.7)); animation: icon-yellow-blink 1s ease-in-out infinite; }
+@keyframes icon-red-blink {
+  0%,100% { filter: drop-shadow(0 0 6px rgba(255,0,0,0.5)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,0,0,0.95)); }
 }
-.card-attacker { border-color: rgba(255,68,68,0.45); background: rgba(40,12,12,0.92); }
-.card-target { border-color: rgba(255,170,0,0.45); background: rgba(40,30,10,0.92); }
-.card-selected { border-color: #fff !important; box-shadow: 0 0 0 3px #fff, 0 10px 30px rgba(0,0,0,0.5) !important; z-index: 30 !important; }
-.card-under-attack { border-color: rgba(255,68,68,0.55); animation: card-under-attack-pulse 1.5s ease-in-out infinite; }
-@keyframes card-under-attack-pulse {
-  0%,100% { box-shadow: 0 0 8px rgba(255,68,68,0.2); }
-  50% { box-shadow: 0 0 20px rgba(255,68,68,0.5), 0 0 40px rgba(255,68,68,0.2); }
+@keyframes icon-yellow-blink {
+  0%,100% { filter: drop-shadow(0 0 6px rgba(255,200,0,0.5)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,200,0,0.95)); }
 }
+.device-card:hover { transform: scale(1.25); z-index: 25; }
+.card-selected .card-icon { filter: drop-shadow(0 0 0 2px #fff) drop-shadow(0 0 8px rgba(255,255,255,0.5)) !important; animation: none !important; }
 
-.card-icon { width: 26px; height: 26px; margin-bottom: 3px; }
-.card-name { font-weight: 600; color: #dde8f0; font-size: 10px; margin-bottom: 1px; }
-.card-mac { color: #667788; font-family: monospace; font-size: 8px; margin-bottom: 2px; }
-.card-signal { display: flex; align-items: center; justify-content: center; gap: 1px; }
-.sig-bar { width: 2px; border-radius: 1px; }
-.bar-1 { height: 6px; background: #334455; } .bar-2 { height: 9px; background: #334455; }
-.bar-3 { height: 13px; background: #e6a23c; } .bar-4 { height: 17px; background: #67c23a; }
-.sig-dbm { font-size: 8px; color: #778899; margin-left: 3px; }
-.card-dist { font-size: 8px; color: #448888; margin-top: 2px; font-weight: 500; }
+.card-icon { width: 34px; height: 34px; display: block; margin: 0 auto 1px; }
+.card-mac { color: #8899aa; font-family: monospace; font-size: 9px; line-height: 1.1; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
 
 /* Device status badges */
 .device-status-badge {
@@ -1230,9 +1207,9 @@ onUnmounted(() => {
 
 /* Hover card */
 .hover-card {
-  position: absolute; z-index: 50;
-  background: rgba(20,28,44,0.98); border: 1px solid rgba(68,136,255,0.35);
-  border-radius: 10px; padding: 12px 16px; font-size: 12px; min-width: 190px; pointer-events: none;
+  position: absolute; bottom: 12px; right: 12px; z-index: 50;
+  background: rgba(20,28,44,0.96); border: 1px solid rgba(68,136,255,0.35);
+  border-radius: 10px; padding: 10px 14px; font-size: 12px; min-width: 190px; pointer-events: none;
 }
 .hc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .hc-icon { width: 24px; height: 24px; }
