@@ -5,12 +5,12 @@
         <div class="card-header">
           <div class="header-left">
             <span>设备白名单管理</span>
-            <el-tag v-if="alertStore.accessListMode === 'whitelist'" type="success" size="small">当前生效中</el-tag>
+            <el-tag v-if="alertStore.accessMode.whitelist" type="success" size="small">当前生效中</el-tag>
           </div>
           <div class="header-actions">
             <div class="toggle-wrapper">
               <span class="toggle-label">启用白名单</span>
-              <el-switch :model-value="alertStore.accessListMode === 'whitelist'" @change="toggleWhitelistMode" active-text="开" inactive-text="关" size="large" />
+              <el-switch :model-value="alertStore.accessMode.whitelist" @change="toggleWhitelistMode" active-text="开" inactive-text="关" size="large" />
             </div>
             <el-button type="primary" size="small" @click="showImportDialog">
               <el-icon><Plus /></el-icon>从在线设备导入
@@ -22,11 +22,16 @@
         </div>
       </template>
 
-      <el-alert v-if="alertStore.accessListMode !== 'whitelist'" title="白名单未启用" type="info" :closable="false" show-icon style="margin-bottom:16px">
-        <p style="margin:0">白名单模式当前未启用。启用后白名单中的设备将被视为可信设备，不会触发安全告警。</p>
+      <el-alert v-if="!alertStore.accessMode.whitelist" title="白名单未启用" type="info" :closable="false" show-icon style="margin-bottom:16px">
+        <p style="margin:0">白名单模式未启用。当前所有连接设备均可自由访问互联网。开启后，只有名单中的设备才能上网。</p>
       </el-alert>
-      <el-alert v-else title="白名单已启用" type="success" :closable="false" show-icon style="margin-bottom:16px">
-        <p style="margin:0">白名单模式已启用，名单中的设备将不会触发安全告警。建议将已知合法设备加入白名单。</p>
+      <el-alert v-else title="白名单模式生效中" type="success" :closable="false" show-icon style="margin-bottom:16px">
+        <p style="margin:0;line-height:1.8">
+          当前白名单模式已生效，接入控制策略如下：<br/>
+          <b>• 白名单设备</b>：允许正常联网，不触发安全告警<br/>
+          <b>• 其他设备</b>：可连接 WiFi 但无法访问互联网，并触发「非法接入」告警<br/>
+          建议将所有已知合法设备加入白名单。
+        </p>
       </el-alert>
 
       <!-- Stats -->
@@ -78,6 +83,12 @@
         <el-form-item label="设备名称">
           <el-input v-model="form.name" placeholder="例: 办公室电脑" />
         </el-form-item>
+        <el-form-item label="设备类型">
+          <el-radio-group v-model="form.deviceType">
+            <el-radio value="phone">📱 手机/平板</el-radio>
+            <el-radio value="pc">💻 电脑</el-radio>
+          </el-radio-group>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -87,9 +98,7 @@
 
     <!-- Batch Import Dialog -->
     <el-dialog v-model="importVisible" title="从在线设备导入" width="650px">
-      <div class="import-hint">
-        选择要加入白名单的在线设备（已加入名单的设备不会显示）
-      </div>
+      <div class="import-hint">选择要加入白名单的在线设备（已加入名单的设备不会显示）</div>
       <el-table :data="importableDevices" style="width:100%" max-height="400" @selection-change="onImportSelect" ref="importTableRef">
         <el-table-column type="selection" width="45" />
         <el-table-column label="类型" width="55">
@@ -105,10 +114,16 @@
             <el-tag :type="row.status === '正常' ? 'success' : 'warning'" size="small">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="设备类型" width="140">
+          <template #default="{ row }">
+            <el-select v-model="row._importType" size="small" placeholder="选择类型" style="width:120px">
+              <el-option label="📱 手机" value="phone" />
+              <el-option label="💻 电脑" value="pc" />
+            </el-select>
+          </template>
+        </el-table-column>
       </el-table>
-      <div class="import-selected" v-if="importSelected.length > 0">
-        已选 <b>{{ importSelected.length }}</b> 个设备
-      </div>
+      <div class="import-selected" v-if="importSelected.length > 0">已选 <b>{{ importSelected.length }}</b> 个设备</div>
       <template #footer>
         <el-button @click="importVisible = false">取消</el-button>
         <el-button type="primary" @click="batchImport" :disabled="importSelected.length === 0">
@@ -129,25 +144,24 @@ const dialogVisible = ref(false)
 const importVisible = ref(false)
 const isEdit = ref(false)
 const editingMac = ref('')
-const form = ref({ mac: '', name: '' })
+const form = ref({ mac: '', name: '', deviceType: 'phone' })
 const importSelected = ref([])
 const importTableRef = ref(null)
 
 const matchedOnlineCount = computed(() =>
-  alertStore.whitelist.filter(w => alertStore.onlineDevices.some(d => d.mac === w.mac)).length
+  alertStore.whitelist.filter(w => alertStore.onlineDevices.some(d => d.mac.toLowerCase() === w.mac.toLowerCase())).length
 )
 const protectedCount = computed(() => alertStore.whitelist.length)
 
 const importableDevices = computed(() =>
   alertStore.onlineDevices.filter(d =>
-    !alertStore.whitelist.some(w => w.mac === d.mac) &&
-    !alertStore.blacklist.some(b => b.mac === d.mac)
-  )
+    !alertStore.whitelist.some(w => w.mac.toLowerCase() === d.mac.toLowerCase()) &&
+    !alertStore.blacklist.some(b => b.mac.toLowerCase() === d.mac.toLowerCase())
+  ).map(d => ({ ...d, _importType: d._importType || 'phone' }))
 )
 
-function isOnline(mac) { return alertStore.onlineDevices.some(d => d.mac === mac) }
-
-function findOnline(mac) { return alertStore.onlineDevices.find(d => d.mac === mac) }
+function isOnline(mac) { return alertStore.onlineDevices.some(d => d.mac.toLowerCase() === mac.toLowerCase()) }
+function findOnline(mac) { return alertStore.onlineDevices.find(d => d.mac.toLowerCase() === mac.toLowerCase()) }
 
 function getDeviceEmoji(dev) {
   const v = (dev.vendor || '').toLowerCase()
@@ -161,33 +175,25 @@ function formatMac() {
   let val = form.value.mac.replace(/[^a-fA-F0-9]/g, '').toUpperCase()
   if (val.length > 12) val = val.slice(0, 12)
   const parts = []
-  for (let i = 0; i < val.length; i += 2) {
-    parts.push(val.slice(i, i + 2))
-  }
+  for (let i = 0; i < val.length; i += 2) parts.push(val.slice(i, i + 2))
   form.value.mac = parts.join(':')
 }
 
-function toggleWhitelistMode(enabled) {
-  if (!enabled) { alertStore.setAccessListMode(''); ElMessage.info('已关闭白名单模式'); return }
-  if (alertStore.accessListMode === 'blacklist') {
-    ElMessageBox.confirm('当前黑名单模式已启用，启用白名单将自动关闭黑名单。是否继续？', '切换名单模式', {
-      confirmButtonText: '确认切换', cancelButtonText: '取消', type: 'warning'
-    }).then(() => {
-      alertStore.setAccessListMode('whitelist')
-      ElMessage.success('已切换为白名单模式')
-    }).catch(() => {})
-    return
+async function toggleWhitelistMode(enabled) {
+  try {
+    await alertStore.setWhitelistEnabled(enabled)
+    ElMessage.success(enabled ? '已启用白名单模式' : '已关闭白名单模式')
+  } catch (e) {
+    ElMessage.error('切换失败: ' + (e.message || '未知错误'))
   }
-  alertStore.setAccessListMode('whitelist')
-  ElMessage.success('已启用白名单模式')
 }
 
-function showAddDialog() { isEdit.value = false; form.value = { mac: '', name: '' }; dialogVisible.value = true }
+function showAddDialog() { isEdit.value = false; form.value = { mac: '', name: '', deviceType: 'phone' }; dialogVisible.value = true }
 function showImportDialog() { importVisible.value = true; importSelected.value = [] }
 
 function editDevice(device) {
   isEdit.value = true; editingMac.value = device.mac
-  form.value = { mac: device.mac, name: device.name }
+  form.value = { mac: device.mac, name: device.name, deviceType: device.deviceType || 'phone' }
   dialogVisible.value = true
 }
 
@@ -196,10 +202,10 @@ async function saveDevice() {
   try {
     if (isEdit.value) {
       await alertStore.removeFromWhitelist(editingMac.value)
-      await alertStore.addToWhitelist({ mac: form.value.mac, name: form.value.name })
+      await alertStore.addToWhitelist({ mac: form.value.mac, name: form.value.name, deviceType: form.value.deviceType })
       ElMessage.success('设备信息已更新')
     } else {
-      await alertStore.addToWhitelist({ mac: form.value.mac, name: form.value.name })
+      await alertStore.addToWhitelist({ mac: form.value.mac, name: form.value.name, deviceType: form.value.deviceType })
       ElMessage.success('设备已加入白名单')
     }
     dialogVisible.value = false
@@ -221,7 +227,9 @@ async function batchImport() {
   let count = 0
   for (const dev of importSelected.value) {
     try {
-      await alertStore.addToWhitelist({ mac: dev.mac, name: `${getDeviceEmoji(dev)} 设备-${dev.mac.slice(-4)}` })
+      const dtype = dev._importType || 'phone'
+      const emoji = dtype === 'phone' ? '📱' : '💻'
+      await alertStore.addToWhitelist({ mac: dev.mac, name: `${emoji} 设备-${dev.mac.slice(-4)}`, deviceType: dtype })
       count++
     } catch {}
   }
@@ -231,6 +239,7 @@ async function batchImport() {
 }
 
 onMounted(() => {
+  alertStore.fetchSystemStatus()
   alertStore.fetchWhitelist()
   alertStore.fetchOnlineDevices()
 })
@@ -244,16 +253,13 @@ onMounted(() => {
 .toggle-wrapper { display: flex; align-items: center; gap: 8px; }
 .toggle-label { font-size: 13px; color: #606266; font-weight: 500; }
 .mono-green { font-family: monospace; font-size: 12px; color: #67c23a; }
-
 .stat-box { text-align: center; padding: 12px; background: #f5f7fa; border-radius: 8px; }
 .stat-box.green { border-left: 3px solid #67c23a; }
 .stat-box.blue { border-left: 3px solid #409eff; }
 .stat-num { display: block; font-size: 22px; font-weight: bold; color: #303133; }
 .stat-lbl { font-size: 11px; color: #909399; }
-
 .online-info { font-size: 12px; color: #606266; }
 .text-muted { font-size: 12px; color: #c0c4cc; }
-
 .import-hint { margin-bottom: 12px; padding: 8px 12px; background: #f0f7ff; border-radius: 6px; font-size: 13px; color: #409eff; }
 .import-selected { margin-top: 10px; font-size: 13px; color: #303133; }
 </style>

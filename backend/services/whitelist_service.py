@@ -9,7 +9,13 @@ def get_all():
     rows = conn.execute("SELECT * FROM whitelist ORDER BY added_at DESC").fetchall()
     conn.close()
     return [
-        {"mac": r["mac"], "name": r["name"], "addedAt": r["added_at"]} for r in rows
+        {
+            "mac": r["mac"],
+            "name": r["name"],
+            "deviceType": r["device_type"] or "",
+            "addedAt": r["added_at"],
+        }
+        for r in rows
     ]
 
 
@@ -23,19 +29,27 @@ def is_blacklisted(mac):
     return row is not None
 
 
-def add(mac, name):
+def add(mac, name, device_type=""):
     mac = normalize_mac(mac)
     if is_blacklisted(mac):
         return False, "该设备已在黑名单中，无法添加到白名单"
 
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO whitelist (mac, name, added_at) VALUES (?, ?, ?)",
-        (mac, name, now_str()),
+        "INSERT OR REPLACE INTO whitelist (mac, name, added_at, device_type) VALUES (?, ?, ?, ?)",
+        (mac, name, now_str(), device_type),
     )
     conn.commit()
     conn.close()
-    add_log("INFO", "config", f"设备加入白名单: {mac}", f"名称={name}")
+    add_log("INFO", "config", f"设备加入白名单: {mac}", f"名称={name} 类型={device_type}")
+
+    # Sync to nftables: allow this MAC to forward traffic
+    try:
+        from services.nftables_service import add_trusted
+        add_trusted(mac)
+    except Exception as e:
+        print(f"[whitelist] nftables sync failed: {e}")
+
     return True, None
 
 
@@ -46,6 +60,13 @@ def remove(mac):
     conn.commit()
     conn.close()
     add_log("INFO", "config", f"设备移出白名单: {mac}")
+
+    # Sync to nftables: revoke forwarding permission
+    try:
+        from services.nftables_service import remove_trusted
+        remove_trusted(mac)
+    except Exception as e:
+        print(f"[whitelist] nftables sync failed: {e}")
 
 
 def is_whitelisted(mac):

@@ -94,6 +94,16 @@ class EvilTwinDetector(BaseDetector):
                 self._ssid_ref_bssid[ssid_key] = bssid
 
             bssids = self._ssid_bssids[ssid_key]
+
+            # Only alert for Evil Twin if this SSID matches our own AP's SSID
+            # (configured via WIFIGUARD_NAME). Random neighbor networks having
+            # multiple APs with the same SSID is normal (mesh, repeaters, etc.)
+            if self._target_bssids:
+                # Check if any of our target BSSIDs use this SSID
+                is_our_ssid = any(b in self._target_bssids for b in bssids)
+                if not is_our_ssid:
+                    continue
+
             if len(bssids) >= 2 and ssid_key not in self._alerted_ssids:
                 ref_bssid = self._choose_reference_bssid(ssid_key, bssids)
                 reasons = []
@@ -101,6 +111,11 @@ class EvilTwinDetector(BaseDetector):
                 for other in bssids:
                     if other == ref_bssid:
                         continue
+
+                    # Skip if this is also one of our known target BSSIDs
+                    if other in self._target_bssids:
+                        continue
+
                     ref_info = self._bssid_info.get(ref_bssid, {})
                     other_info = self._bssid_info.get(other, {})
 
@@ -145,14 +160,18 @@ class EvilTwinDetector(BaseDetector):
                     if self._target_bssids and other not in self._target_bssids:
                         reasons.append("{} 不在合法BSSID集合中".format(other))
 
+                # Only alert if we actually found suspicious differences
+                if not reasons:
+                    continue
+
                 self._alerted_ssids.add(ssid_key)
                 bssid_list = ", ".join(sorted(bssids))
-                extra = "；".join(reasons) if reasons else "多个BSSID广播同一SSID"
+                extra = "；".join(reasons)
                 return {
                     "type": self.name,
                     "severity": self.severity,
-                    "sourceMac": list(bssids)[1],
-                    "targetMac": list(bssids)[0],
+                    "sourceMac": list(bssids - {ref_bssid})[0] if len(bssids) > 1 else list(bssids)[0],
+                    "targetMac": ref_bssid,
                     "timestamp": now_str(),
                     "suggestion": (
                         "{} 检测到SSID '{}' 由多个BSSID广播: {}。{}".format(

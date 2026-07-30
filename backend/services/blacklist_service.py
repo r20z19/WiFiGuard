@@ -42,6 +42,16 @@ def add(mac, name, reason):
     conn.commit()
     conn.close()
     add_log("WARNING", "config", f"设备加入黑名单: {mac}", f"名称={name} 原因={reason}")
+
+    # Sync to nftables: block this MAC and deny from AP
+    try:
+        from services.nftables_service import add_blocked
+        from services.hostapd_service import deny_station
+        add_blocked(mac)
+        deny_station(mac)
+    except Exception as e:
+        print(f"[blacklist] nftables/hostapd sync failed: {e}")
+
     return True, None
 
 
@@ -52,6 +62,15 @@ def remove(mac):
     conn.commit()
     conn.close()
     add_log("INFO", "config", f"设备移出黑名单: {mac}")
+
+    # Sync to nftables: unblock this MAC and remove from hostapd deny ACL
+    try:
+        from services.nftables_service import remove_blocked
+        from services.hostapd_service import allow_station
+        remove_blocked(mac)
+        allow_station(mac)
+    except Exception as e:
+        print(f"[blacklist] nftables/hostapd sync failed: {e}")
 
 
 def is_blacklisted(mac):

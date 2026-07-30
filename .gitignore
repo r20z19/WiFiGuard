@@ -2,6 +2,7 @@ node_modules
 package-lock.json
 .marscode/
 CLAUDE.md
+.claude/
 
 # Backend
 backend/data/

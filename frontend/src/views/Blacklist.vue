@@ -5,12 +5,12 @@
         <div class="card-header">
           <div class="header-left">
             <span>设备黑名单管理</span>
-            <el-tag v-if="alertStore.accessListMode === 'blacklist'" type="danger" size="small">当前生效中</el-tag>
+            <el-tag v-if="alertStore.accessMode.blacklist" type="danger" size="small">当前生效中</el-tag>
           </div>
           <div class="header-actions">
             <div class="toggle-wrapper">
               <span class="toggle-label">启用黑名单</span>
-              <el-switch :model-value="alertStore.accessListMode === 'blacklist'" @change="toggleBlacklistMode" active-text="开" inactive-text="关" size="large" />
+              <el-switch :model-value="alertStore.accessMode.blacklist" @change="toggleBlacklistMode" active-text="开" inactive-text="关" size="large" />
             </div>
             <el-button type="warning" size="small" @click="showImportDialog">
               <el-icon><Plus /></el-icon>从在线设备导入
@@ -22,11 +22,15 @@
         </div>
       </template>
 
-      <el-alert v-if="alertStore.accessListMode !== 'blacklist'" title="黑名单未启用" type="info" :closable="false" show-icon style="margin-bottom:16px">
-        <p style="margin:0">黑名单模式当前未启用。启用后黑名单中的设备一旦被检测到将立即触发安全告警。</p>
+      <el-alert v-if="!alertStore.accessMode.blacklist" title="黑名单未启用" type="info" :closable="false" show-icon style="margin-bottom:16px">
+        <p style="margin:0">黑名单模式未启用。当前不会对任何设备执行踢出操作。开启后，名单中的设备将被自动断开连接。</p>
       </el-alert>
-      <el-alert v-else title="黑名单已启用" type="error" :closable="false" show-icon style="margin-bottom:16px">
-        <p style="margin:0">黑名单模式已启用，名单中的设备一旦检测到将自动触发告警并记录。</p>
+      <el-alert v-else title="黑名单模式生效中" type="error" :closable="false" show-icon style="margin-bottom:16px">
+        <p style="margin:0;line-height:1.8">
+          当前黑名单模式已生效：<br/>
+          <b>• 黑名单设备</b>：一旦尝试接入将被立即踢出网络，并触发安全告警<br/>
+          <b>• 其他设备</b>：不受影响，可正常连接和使用网络
+        </p>
       </el-alert>
 
       <!-- Stats -->
@@ -115,9 +119,7 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="import-selected" v-if="importSelected.length > 0">
-        已选 <b>{{ importSelected.length }}</b> 个设备
-      </div>
+      <div class="import-selected" v-if="importSelected.length > 0">已选 <b>{{ importSelected.length }}</b> 个设备</div>
       <template #footer>
         <el-button @click="importVisible = false">取消</el-button>
         <el-button type="danger" @click="batchImport" :disabled="importSelected.length === 0">
@@ -143,7 +145,7 @@ const importSelected = ref([])
 const importTableRef = ref(null)
 
 const onlineBlacklistedCount = computed(() =>
-  alertStore.blacklist.filter(b => alertStore.onlineDevices.some(d => d.mac === b.mac)).length
+  alertStore.blacklist.filter(b => alertStore.onlineDevices.some(d => d.mac.toLowerCase() === b.mac.toLowerCase())).length
 )
 
 const alertCountRelated = computed(() =>
@@ -159,8 +161,8 @@ const importableDevices = computed(() =>
   )
 )
 
-function isOnline(mac) { return alertStore.onlineDevices.some(d => d.mac === mac) }
-function findOnline(mac) { return alertStore.onlineDevices.find(d => d.mac === mac) }
+function isOnline(mac) { return alertStore.onlineDevices.some(d => d.mac.toLowerCase() === mac.toLowerCase()) }
+function findOnline(mac) { return alertStore.onlineDevices.find(d => d.mac.toLowerCase() === mac.toLowerCase()) }
 
 function getDeviceEmoji(dev) {
   const v = (dev.vendor || '').toLowerCase()
@@ -178,19 +180,13 @@ function formatMac() {
   form.value.mac = parts.join(':')
 }
 
-function toggleBlacklistMode(enabled) {
-  if (!enabled) { alertStore.setAccessListMode(''); ElMessage.info('已关闭黑名单模式'); return }
-  if (alertStore.accessListMode === 'whitelist') {
-    ElMessageBox.confirm('当前白名单模式已启用，启用黑名单将自动关闭白名单。是否继续？', '切换名单模式', {
-      confirmButtonText: '确认切换', cancelButtonText: '取消', type: 'warning'
-    }).then(() => {
-      alertStore.setAccessListMode('blacklist')
-      ElMessage.success('已切换为黑名单模式')
-    }).catch(() => {})
-    return
+async function toggleBlacklistMode(enabled) {
+  try {
+    await alertStore.setBlacklistEnabled(enabled)
+    ElMessage.success(enabled ? '已启用黑名单模式' : '已关闭黑名单模式')
+  } catch (e) {
+    ElMessage.error('切换失败: ' + (e.message || '未知错误'))
   }
-  alertStore.setAccessListMode('blacklist')
-  ElMessage.success('已启用黑名单模式')
 }
 
 function showAddDialog() { isEdit.value = false; form.value = { mac: '', name: '', reason: '' }; dialogVisible.value = true }
@@ -243,6 +239,7 @@ async function batchImport() {
 }
 
 onMounted(() => {
+  alertStore.fetchSystemStatus()
   alertStore.fetchBlacklist()
   alertStore.fetchOnlineDevices()
   alertStore.fetchCurrentAlerts()
@@ -257,16 +254,13 @@ onMounted(() => {
 .toggle-wrapper { display: flex; align-items: center; gap: 8px; }
 .toggle-label { font-size: 13px; color: #606266; font-weight: 500; }
 .mono-red { font-family: monospace; font-size: 12px; color: #f56c6c; }
-
 .stat-box { text-align: center; padding: 12px; background: #f5f7fa; border-radius: 8px; }
 .stat-box.danger { border-left: 3px solid #f56c6c; }
 .stat-box.orange { border-left: 3px solid #e6a23c; }
 .stat-num { display: block; font-size: 22px; font-weight: bold; color: #303133; }
 .stat-lbl { font-size: 11px; color: #909399; }
-
 .online-info { font-size: 12px; color: #606266; font-family: monospace; }
 .text-muted { font-size: 12px; color: #c0c4cc; }
-
 .import-hint { margin-bottom: 12px; padding: 8px 12px; background: #fef0f0; border-radius: 6px; font-size: 13px; color: #f56c6c; }
 .import-selected { margin-top: 10px; font-size: 13px; color: #303133; }
 </style>

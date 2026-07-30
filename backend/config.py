@@ -65,10 +65,17 @@ TARGET_SSID = os.environ.get("WIFIGUARD_NAME", "")
 TARGET_BSSID = os.environ.get("WIFIGUARD_BSSID", "").lower()
 
 # Access control modes:
-#   monitor    only alert/log
-#   blacklist  deauth clients listed in blacklist (uses WPA2 weakness)
-#   whitelist  deauth clients not listed in whitelist (uses WPA2 weakness)
-ACCESS_CONTROL_MODE = os.environ.get("WIFIGUARD_ACCESS_MODE", "monitor").lower()
+#   monitor    only alert/log, no enforcement
+#   blacklist  kick+block clients in blacklist only
+#   whitelist  strangers can associate but cannot reach internet (nftables drop);
+#              only whitelisted MACs get forwarding. Blacklisted MACs are kicked.
+ACCESS_CONTROL_MODE = os.environ.get("WIFIGUARD_ACCESS_MODE", "whitelist").lower()
+
+# Independent access control toggles (new model):
+#   Both can be enabled simultaneously for combined enforcement.
+WHITELIST_ENABLED = os.environ.get("WIFIGUARD_WHITELIST_ENABLED", "true").lower() == "true"
+BLACKLIST_ENABLED = os.environ.get("WIFIGUARD_BLACKLIST_ENABLED", "true").lower() == "true"
+
 DEAUTH_COUNT = int(os.environ.get("WIFIGUARD_DEAUTH_COUNT", "5"))
 DEAUTH_COOLDOWN_SECONDS = int(os.environ.get("WIFIGUARD_DEAUTH_COOLDOWN", "30"))
 

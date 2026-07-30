@@ -42,20 +42,40 @@ def get_history_alerts(alert_type=None, status=None, start_date=None, end_date=N
 
 def create_alert(alert_data):
     conn = get_db()
+    ts = alert_data.get("timestamp", now_str())
+    source_mac = alert_data.get("sourceMac", alert_data.get("source_mac", ""))
+    target_mac = alert_data.get("targetMac", alert_data.get("target_mac", ""))
+    suggestion = alert_data.get("suggestion", "")
+
     cursor = conn.execute(
         """INSERT INTO alerts_current (type, severity, source_mac, target_mac, timestamp, suggestion, status)
            VALUES (?, ?, ?, ?, ?, ?, '未处理')""",
         (
             alert_data["type"],
             alert_data["severity"],
-            alert_data.get("sourceMac", alert_data.get("source_mac", "")),
-            alert_data.get("targetMac", alert_data.get("target_mac", "")),
-            alert_data.get("timestamp", now_str()),
-            alert_data.get("suggestion", ""),
+            source_mac,
+            target_mac,
+            ts,
+            suggestion,
+        ),
+    )
+    alert_id = cursor.lastrowid
+
+    # Also write to history for permanent record
+    conn.execute(
+        """INSERT INTO alerts_history (id, type, severity, source_mac, target_mac, timestamp, suggestion, status, cleared_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, '未处理', NULL)""",
+        (
+            alert_id,
+            alert_data["type"],
+            alert_data["severity"],
+            source_mac,
+            target_mac,
+            ts,
+            suggestion,
         ),
     )
     conn.commit()
-    alert_id = cursor.lastrowid
     conn.close()
     # Log to event buffer for AI analysis
     log_attack_event(
@@ -90,19 +110,10 @@ def clear_alert(alert_id):
 
     alert = _row_to_dict(row)
 
+    # Update history record status to cleared
     conn.execute(
-        """INSERT INTO alerts_history (id, type, severity, source_mac, target_mac, timestamp, suggestion, status, cleared_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, '已删除', ?)""",
-        (
-            alert["id"],
-            alert["type"],
-            alert["severity"],
-            alert["sourceMac"],
-            alert["targetMac"],
-            alert["timestamp"],
-            alert["suggestion"],
-            now_str(),
-        ),
+        """UPDATE alerts_history SET status = '已处理', cleared_at = ? WHERE id = ?""",
+        (now_str(), alert_id),
     )
     conn.execute("DELETE FROM alerts_current WHERE id = ?", (alert_id,))
     conn.commit()

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import {
   getSystemStatus,
   getCurrentAlerts,
@@ -15,18 +15,18 @@ import {
   updateEmailConfig as apiUpdateEmailConfig,
   testEmailConnection,
   getEmailRecords,
-  clearAlert as apiClearAlert
+  clearAlert as apiClearAlert,
+  updateAccessMode as apiUpdateAccessMode
 } from '../api/index'
 
 export const useAlertStore = defineStore('alert', () => {
-  const ACCESS_LIST_MODE_STORAGE_KEY = 'wifiguard_access_list_mode'
   const systemStatus = ref({ status: 'initializing', uptime: 0, monitorInterface: '' })
   const currentAlerts = ref([])
   const historyAlerts = ref([])
   const onlineDevices = ref([])
   const whitelist = ref([])
   const blacklist = ref([])
-  const accessListMode = ref(localStorage.getItem(ACCESS_LIST_MODE_STORAGE_KEY) || '')
+  const accessMode = ref({ whitelist: false, blacklist: false })
   const emailConfig = ref({
     smtpHost: '',
     smtpPort: 465,
@@ -41,6 +41,11 @@ export const useAlertStore = defineStore('alert', () => {
   async function fetchSystemStatus() {
     try {
       systemStatus.value = await getSystemStatus()
+      // Sync access mode from backend
+      accessMode.value = {
+        whitelist: systemStatus.value.whitelistEnabled ?? false,
+        blacklist: systemStatus.value.blacklistEnabled ?? false,
+      }
     } catch (e) {
       console.error('fetchSystemStatus failed:', e)
     }
@@ -120,7 +125,8 @@ export const useAlertStore = defineStore('alert', () => {
     try {
       await apiAddToWhitelist({
         mac: device.mac,
-        name: device.name || `设备-${device.mac.slice(-4)}`
+        name: device.name || `设备-${device.mac.slice(-4)}`,
+        deviceType: device.deviceType || ''
       })
       await fetchWhitelist()
     } catch (e) {
@@ -176,14 +182,32 @@ export const useAlertStore = defineStore('alert', () => {
     return await testEmailConnection(config)
   }
 
-  function setAccessListMode(mode) {
-    const next = mode === 'whitelist' || mode === 'blacklist' ? mode : ''
-    accessListMode.value = next
-    if (next) {
-      localStorage.setItem(ACCESS_LIST_MODE_STORAGE_KEY, next)
-      return
+  // Backward-compatible getter for views that still use accessListMode
+  const accessListMode = computed(() => {
+    if (accessMode.value.whitelist && accessMode.value.blacklist) return 'both'
+    if (accessMode.value.whitelist) return 'whitelist'
+    if (accessMode.value.blacklist) return 'blacklist'
+    return ''
+  })
+
+  async function setWhitelistEnabled(enabled) {
+    try {
+      const res = await apiUpdateAccessMode({ whitelistEnabled: enabled })
+      accessMode.value.whitelist = res.whitelistEnabled
+    } catch (e) {
+      console.error('setWhitelistEnabled failed:', e)
+      throw e
     }
-    localStorage.removeItem(ACCESS_LIST_MODE_STORAGE_KEY)
+  }
+
+  async function setBlacklistEnabled(enabled) {
+    try {
+      const res = await apiUpdateAccessMode({ blacklistEnabled: enabled })
+      accessMode.value.blacklist = res.blacklistEnabled
+    } catch (e) {
+      console.error('setBlacklistEnabled failed:', e)
+      throw e
+    }
   }
 
   return {
@@ -193,6 +217,7 @@ export const useAlertStore = defineStore('alert', () => {
     onlineDevices,
     whitelist,
     blacklist,
+    accessMode,
     accessListMode,
     emailConfig,
     emailRecords,
@@ -213,6 +238,7 @@ export const useAlertStore = defineStore('alert', () => {
     removeFromBlacklist,
     updateEmailConfig,
     testEmail,
-    setAccessListMode
+    setWhitelistEnabled,
+    setBlacklistEnabled
   }
 })

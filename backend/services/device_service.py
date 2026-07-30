@@ -1,14 +1,78 @@
 from database import get_db
 from utils.time_utils import now_str
+from utils.oui_db import lookup_vendor
 
 
 def get_online_devices():
+    """获取在线设备列表: AP 自身 + hostapd 关联的站点"""
+    from services.hostapd_service import get_connected_stations, get_status
+
+    devices = []
+    now = now_str()
+
+    # AP 自身
+    try:
+        status = get_status()
+        if status:
+            ap_mac = (status.get("bssid[0]") or status.get("bssid") or "").lower()
+            ap_ssid = status.get("ssid[0]") or status.get("ssid") or ""
+            if ap_mac:
+                devices.append({
+                    "mac": ap_mac,
+                    "ip": "",
+                    "ssid": ap_ssid,
+                    "signal": 0,
+                    "status": "正常",
+                    "firstSeen": "",
+                    "lastSeen": now,
+                    "vendor": "",
+                    "pairwiseCipher": "",
+                    "groupCipher": "",
+                    "akm": "",
+                })
+    except Exception:
+        pass
+
+    # 关联的客户端
+    try:
+        stations = get_connected_stations()
+        for sta in stations:
+            mac = sta.get("mac", "").lower()
+            if not mac:
+                continue
+            signal = int(sta.get("signal", -50)) or -50
+            devices.append({
+                "mac": mac,
+                "ip": "",
+                "ssid": devices[0]["ssid"] if devices else "",
+                "signal": signal,
+                "status": "正常",
+                "firstSeen": "",
+                "lastSeen": now,
+                "vendor": lookup_vendor(mac),
+                "pairwiseCipher": "",
+                "groupCipher": "",
+                "akm": "",
+            })
+    except Exception:
+        pass
+
+    # 补充数据库中的额外信息 (ip, vendor, firstSeen 等)
     conn = get_db()
-    rows = conn.execute(
-        "SELECT * FROM devices_online ORDER BY last_seen DESC"
-    ).fetchall()
+    for dev in devices:
+        row = conn.execute(
+            "SELECT * FROM devices_online WHERE mac = ?", (dev["mac"],)
+        ).fetchone()
+        if row:
+            dev["ip"] = row["ip"] or dev["ip"]
+            dev["vendor"] = row["vendor"] or dev["vendor"]
+            dev["firstSeen"] = row["first_seen"] or dev["firstSeen"]
+            dev["pairwiseCipher"] = row["pairwise_cipher"] or dev["pairwiseCipher"]
+            dev["groupCipher"] = row["group_cipher"] or dev["groupCipher"]
+            dev["akm"] = row["akm"] or dev["akm"]
     conn.close()
-    return [_row_to_dict(r) for r in rows]
+
+    return devices
 
 
 def upsert_device(device):

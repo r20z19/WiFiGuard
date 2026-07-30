@@ -349,7 +349,7 @@ const clearAllAlerts = () => {
 }
 
 const oneClickDispose = async (row) => {
-  if (alertStore.accessListMode !== 'blacklist') {
+  if (!alertStore.accessMode.blacklist) {
     ElMessage.warning('请先在黑名单页面开启黑名单模式')
     return
   }
@@ -361,7 +361,7 @@ const oneClickDispose = async (row) => {
 }
 
 const quickBlacklist = async (row) => {
-  if (alertStore.accessListMode !== 'blacklist') {
+  if (!alertStore.accessMode.blacklist) {
     ElMessage.warning('请先在黑名单页面开启黑名单模式')
     return
   }

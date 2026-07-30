@@ -41,6 +41,8 @@ api.interceptors.response.use(
 
 export const getSystemStatus = () => api.get('/system/status')
 
+export const updateAccessMode = (data) => api.put('/system/access-mode', data)
+
 export const getCurrentAlerts = () => api.get('/alerts/current')
 
 export const getHistoryAlerts = (params) => api.get('/alerts/history', { params })

@@ -101,12 +101,12 @@
           <el-menu-item index="/whitelist">
             <el-icon><Check /></el-icon>
             <span>设备白名单</span>
-            <el-tag v-if="!isCollapsed && alertStore.accessListMode === 'whitelist'" size="small" type="success" class="mode-tag">启用</el-tag>
+            <el-tag v-if="!isCollapsed && alertStore.accessMode.whitelist" size="small" type="success" class="mode-tag">启用</el-tag>
           </el-menu-item>
           <el-menu-item index="/blacklist">
             <el-icon><Close /></el-icon>
             <span>设备黑名单</span>
-            <el-tag v-if="!isCollapsed && alertStore.accessListMode === 'blacklist'" size="small" type="danger" class="mode-tag">启用</el-tag>
+            <el-tag v-if="!isCollapsed && alertStore.accessMode.blacklist" size="small" type="danger" class="mode-tag">启用</el-tag>
           </el-menu-item>
           <el-menu-item index="/email">
             <el-icon><Message /></el-icon>

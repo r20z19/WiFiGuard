@@ -15,10 +15,12 @@ class BruteForceDetector(BaseDetector):
         "或确保WPA2-PSK使用强密码，并配置AP的认证失败速率限制和锁定策略。"
     )
 
-    # Threshold: >5 auth attempts from same client MAC in a 30-second window
-    AUTH_THRESHOLD = 5
+    # Threshold: >15 auth attempts from same client MAC in a 30-second window
+    # Normal connections typically produce 1-3 auth frames; legitimate retries
+    # (e.g. wrong password, signal loss) may produce up to 10.
+    AUTH_THRESHOLD = 15
     WINDOW_SECONDS = 30
-    COOLDOWN_SECONDS = 60
+    COOLDOWN_SECONDS = 120
 
     def __init__(self):
         self._auth_buckets = defaultdict(list)

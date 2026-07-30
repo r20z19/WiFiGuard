@@ -58,7 +58,7 @@
             >
               <img :src="getIconUrl(dev._dtype)" class="lp-icon" />
               <div class="lp-info">
-                <div class="lp-name">{{ getTypeName(dev._dtype) }}</div>
+                <div class="lp-name">{{ getDevName(dev) }}</div>
                 <div class="lp-mac">{{ dev.mac?.slice(-8) }}</div>
               </div>
               <div class="lp-right">
@@ -255,7 +255,7 @@
         <div v-if="hoveredMac && hoveredDevice" class="hover-card">
           <div class="hc-head">
             <img :src="getIconUrl(hoveredDevice._dtype)" class="hc-icon" />
-            <span>{{ getTypeName(hoveredDevice._dtype) }}</span>
+            <span>{{ getDevName(hoveredDevice) }}</span>
           </div>
           <div class="hc-row"><span>MAC</span><span class="mono">{{ hoveredDevice.mac }}</span></div>
           <div class="hc-row"><span>IP</span><span>{{ hoveredDevice.ip || '-' }}</span></div>
@@ -272,7 +272,7 @@
             <div class="rp-dev-header">
               <img :src="getIconUrl(detailDevice._dtype)" class="rp-dev-icon-sm" />
               <div>
-                <div class="rp-dev-name-sm">{{ getTypeName(detailDevice._dtype) }}</div>
+                <div class="rp-dev-name-sm">{{ getDevName(detailDevice) }}</div>
                 <div class="rp-dev-mac-sm">{{ detailDevice.mac }}</div>
               </div>
               <el-button :icon="Close" circle size="small" text @click="detailDevice = null; selectedMac = null" />
@@ -286,8 +286,8 @@
               <div class="rp-meta-item"><span>加密</span><span>{{ detailDevice.pairwiseCipher || '-' }}</span></div>
             </div>
             <div class="rp-actions">
-              <el-button type="danger" size="small" @click="quickBlacklist(detailDevice)" :disabled="alertStore.accessListMode !== 'blacklist'">{{ alertStore.accessListMode === 'blacklist' ? '加入黑名单' : '黑名单未启用' }}</el-button>
-              <el-button type="success" size="small" @click="quickWhitelist(detailDevice)" :disabled="alertStore.accessListMode !== 'whitelist'">{{ alertStore.accessListMode === 'whitelist' ? '加入白名单' : '白名单未启用' }}</el-button>
+              <el-button type="danger" size="small" @click="quickBlacklist(detailDevice)" :disabled="!alertStore.accessMode.blacklist">{{ alertStore.accessMode.blacklist ? '加入黑名单' : '黑名单未启用' }}</el-button>
+              <el-button type="success" size="small" @click="quickWhitelist(detailDevice)" :disabled="!alertStore.accessMode.whitelist">{{ alertStore.accessMode.whitelist ? '加入白名单' : '白名单未启用' }}</el-button>
             </div>
           </div>
 
@@ -483,6 +483,10 @@ function getIconUrl(t) { return (DEVICE_ICONS[t] || DEVICE_ICONS['default']).rep
 function getTypeName(t) {
   return { router: '路由器', pc: '用户设备', phone: '用户设备', attacker: '攻击者' }[t] || '设备'
 }
+function getDevName(dev) {
+  if (dev.name) return dev.name
+  return getTypeName(dev._dtype)
+}
 function sevType(s) { return {critical:'danger',high:'danger',medium:'warning',low:'success'}[s]||'info' }
 function sevLabel(s) { return {critical:'严重',high:'高危',medium:'中危',low:'低危'}[s]||s }
 function sigColor(s) { if (s >= -50) return '#67c23a'; if (s >= -70) return '#e6a23c'; return '#f56c6c' }
@@ -536,8 +540,12 @@ function classify(d, allDevs) {
       _routerMac = d.mac
       return 'router'
     }
-    // Other router-like devices → treat as users
   }
+  // Whitelist-annotated device type takes priority
+  const dt = (d.deviceType || '').toLowerCase()
+  if (dt === 'phone' || dt === 'tablet') return 'phone'
+  if (dt === 'pc' || dt === 'laptop') return 'pc'
+  // Fallback: vendor-based heuristic
   const v = (d.vendor || '').toLowerCase()
   if (/apple|samsung|xiaomi|oppo|vivo|oneplus|huawei|google/.test(v)) return 'phone'
   if (/dell|lenovo|hp|intel|asustek|acer|microsoft|msi/.test(v)) return 'pc'
@@ -810,11 +818,11 @@ async function aiInterpretAttack(alert) {
 }
 
 async function quickBlacklist(d) {
-  if (alertStore.accessListMode !== 'blacklist') { ElMessage.warning('请先在黑名单页面开启黑名单模式'); return }
+  if (!alertStore.accessMode.blacklist) { ElMessage.warning('请先在黑名单页面开启黑名单模式'); return }
   try { await alertStore.addToBlacklist({ mac: d.mac, name: d.mac, reason: '拓扑添加' }) } catch {}
 }
 async function quickWhitelist(d) {
-  if (alertStore.accessListMode !== 'whitelist') { ElMessage.warning('请先在白名单页面开启白名单模式'); return }
+  if (!alertStore.accessMode.whitelist) { ElMessage.warning('请先在白名单页面开启白名单模式'); return }
   try { await alertStore.addToWhitelist({ mac: d.mac, name: d.mac }) } catch {}
 }
 
@@ -969,6 +977,7 @@ onUnmounted(() => {
   background: #111a28;
   box-shadow: inset 0 0 120px rgba(0,0,0,0.5);
   overflow: hidden;
+  z-index: 1;
 }
 .wall-top, .wall-bottom {
   position: absolute; left: 0; right: 0; height: 14px;

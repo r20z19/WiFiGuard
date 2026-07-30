@@ -1,6 +1,24 @@
+import os
+
 from detection.base import BaseDetector
 from detection.packet_reader import FC_BEACON, FC_PROBE_RESP
 from utils.time_utils import now_str
+
+HOSTAPD_CONF = "/etc/hostapd/wifiguard.conf"
+
+
+def _read_hostapd_pmf():
+    """直接读 hostapd 配置文件判断 PMF 是否开启，比解析 beacon 可靠"""
+    try:
+        with open(HOSTAPD_CONF) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("ieee80211w="):
+                    val = line.split("=", 1)[1].strip()
+                    return int(val) >= 1
+    except (OSError, ValueError):
+        pass
+    return False
 
 
 class WeakEncryptionDetector(BaseDetector):
@@ -15,13 +33,24 @@ class WeakEncryptionDetector(BaseDetector):
 
     def __init__(self):
         self._alerted_bssids = set()
+        self._target_bssids = set()
+
+    def set_target_bssids(self, bssids):
+        """Only alert on weak encryption for our own AP, not neighbors."""
+        self._target_bssids = {b.lower() for b in bssids if b}
 
     def analyze(self, frames):
         for f in frames:
             if f["frameType"] not in (FC_BEACON, FC_PROBE_RESP):
                 continue
-            bssid = f.get("bssid") or f.get("sa") or "N/A"
+            bssid = (f.get("bssid") or f.get("sa") or "").lower()
+            if not bssid or bssid == "n/a":
+                continue
             if bssid in self._alerted_bssids:
+                continue
+
+            # Only check our own AP for weak encryption, not neighbor networks
+            if self._target_bssids and bssid not in self._target_bssids:
                 continue
 
             reason = self._weak_reason(f)
@@ -48,8 +77,6 @@ class WeakEncryptionDetector(BaseDetector):
         group_cipher = str(frame.get("groupCipher", ""))
         pairwise_cipher = str(frame.get("pairwiseCipher", ""))
         akm = str(frame.get("akm", ""))
-        pmf_capable = str(frame.get("pmfCapable", "")).lower()
-        pmf_required = str(frame.get("pmfRequired", "")).lower()
 
         if privacy == "0":
             return "开放网络未启用加密"
@@ -65,8 +92,10 @@ class WeakEncryptionDetector(BaseDetector):
         if weak:
             return "使用{}".format("/".join(sorted(set(weak))))
 
-        if akm == "2" and pmf_capable in ("0", "false") and pmf_required in ("0", "false"):
-            return "WPA2-PSK未启用PMF"
+        # WPA2-PSK: 直接读 hostapd 配置判断 PMF
+        if akm == "2":
+            if not _read_hostapd_pmf():
+                return "WPA2-PSK未启用PMF（管理帧保护）"
         return ""
 
     def reset(self):

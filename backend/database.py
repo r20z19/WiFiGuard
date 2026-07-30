@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS devices_online (
 CREATE TABLE IF NOT EXISTS whitelist (
     mac TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    added_at TEXT NOT NULL
+    added_at TEXT NOT NULL,
+    device_type TEXT DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS blacklist (

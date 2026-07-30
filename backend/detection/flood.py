@@ -15,25 +15,31 @@ class FloodDetector(BaseDetector):
         "必要时使用WIPS（无线入侵防御系统）进行自动阻断。"
     )
 
-    # Threshold: >100 probe responses from same MAC in 1 second
-    PROBE_RESP_THRESHOLD = 100
-    # Threshold: >200 management frames from same MAC in 1 second (excluding deauth)
-    MGMT_FLOOD_THRESHOLD = 200
+    # Per-source thresholds
+    PROBE_RESP_THRESHOLD = 100   # >100 probe resp from same MAC in 1s
+    MGMT_FLOOD_THRESHOLD = 200   # >200 mgmt frames from same MAC in 1s
+
+    # Global threshold (catches random-MAC beacon flood like mdk4 b mode)
+    GLOBAL_BEACON_THRESHOLD = 300  # >300 beacon/probe frames total in 1s
+    GLOBAL_WINDOW_SECONDS = 1
+
     WINDOW_SECONDS = 1
     COOLDOWN_SECONDS = 60
 
-    # Management frame types to count for mgmt flood (exclude deauth - handled by DeauthDetector)
+    # Management frame types to count (exclude deauth - handled by DeauthDetector)
     MGMT_FRAME_TYPES = {FC_PROBE_RESP, FC_BEACON}
 
     def __init__(self):
         self._probe_buckets = defaultdict(list)
         self._mgmt_buckets = defaultdict(list)
+        self._global_beacon_bucket = []
         self._alerted_macs = set()
         self._last_alert_time = {}
 
     def analyze(self, frames):
         now = time.time()
         cutoff = now - self.WINDOW_SECONDS
+        global_cutoff = now - self.GLOBAL_WINDOW_SECONDS
 
         for f in frames:
             ft = f["frameType"]
@@ -41,6 +47,7 @@ class FloodDetector(BaseDetector):
             if not sa:
                 continue
 
+            # Per-source probe response detection
             if ft == FC_PROBE_RESP:
                 pb = self._probe_buckets[sa]
                 pb.append(now)
@@ -50,6 +57,7 @@ class FloodDetector(BaseDetector):
                     if self._check_cooldown(sa, now):
                         return self._make_alert(sa, f.get("da", "Unknown"))
 
+            # Per-source management frame detection
             if ft in self.MGMT_FRAME_TYPES:
                 mb = self._mgmt_buckets[sa]
                 mb.append(now)
@@ -58,6 +66,24 @@ class FloodDetector(BaseDetector):
                 if len(mb) >= self.MGMT_FLOOD_THRESHOLD:
                     if self._check_cooldown(sa, now):
                         return self._make_alert(sa, f.get("da", "Unknown"))
+
+                # Global beacon/probe counter (catches random-MAC floods)
+                self._global_beacon_bucket.append(now)
+
+        # Prune global bucket
+        while self._global_beacon_bucket and self._global_beacon_bucket[0] < global_cutoff:
+            self._global_beacon_bucket.pop(0)
+
+        # Check global threshold
+        if len(self._global_beacon_bucket) >= self.GLOBAL_BEACON_THRESHOLD:
+            # Use a sentinel key for global cooldown
+            if self._check_cooldown("__global_flood__", now):
+                self._global_beacon_bucket.clear()
+                return self._make_alert(
+                    "ff:ff:ff:00:00:01",
+                    "ff:ff:ff:ff:ff:ff",
+                    detail="检测到大量伪造源地址的Beacon/Probe泛洪攻击。"
+                )
 
         return None
 
@@ -68,18 +94,19 @@ class FloodDetector(BaseDetector):
         self._last_alert_time[sa] = now
         return True
 
-    def _make_alert(self, sa, da):
+    def _make_alert(self, sa, da, detail=None):
         return {
             "type": self.name,
             "severity": self.severity,
             "sourceMac": sa,
             "targetMac": da,
             "timestamp": now_str(),
-            "suggestion": self.suggestion,
+            "suggestion": (detail + " " if detail else "") + self.suggestion,
         }
 
     def reset(self):
         self._probe_buckets.clear()
         self._mgmt_buckets.clear()
+        self._global_beacon_bucket.clear()
         self._alerted_macs.clear()
         self._last_alert_time.clear()

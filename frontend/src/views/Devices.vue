@@ -97,8 +97,8 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link size="small" @click.stop="showDetail(row)">详情</el-button>
-            <el-button type="success" link size="small" @click.stop="addToWhitelist(row)" :disabled="isInWhitelist(row.mac) || isInBlacklist(row.mac) || alertStore.accessListMode !== 'whitelist'" :title="alertStore.accessListMode !== 'whitelist' ? '请先开启白名单模式' : ''">白名单</el-button>
-            <el-button type="danger" link size="small" @click.stop="addToBlacklist(row)" :disabled="isInBlacklist(row.mac) || isInWhitelist(row.mac) || alertStore.accessListMode !== 'blacklist'" :title="alertStore.accessListMode !== 'blacklist' ? '请先开启黑名单模式' : ''">黑名单</el-button>
+            <el-button type="success" link size="small" @click.stop="addToWhitelist(row)" :disabled="isInWhitelist(row.mac) || isInBlacklist(row.mac) || !alertStore.accessMode.whitelist" :title="!alertStore.accessMode.whitelist ? '请先开启白名单模式' : ''">白名单</el-button>
+            <el-button type="danger" link size="small" @click.stop="addToBlacklist(row)" :disabled="isInBlacklist(row.mac) || isInWhitelist(row.mac) || !alertStore.accessMode.blacklist" :title="!alertStore.accessMode.blacklist ? '请先开启黑名单模式' : ''">黑名单</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -193,8 +193,8 @@
         <div class="drawer-section">
           <div class="drawer-section-title">操作</div>
           <div class="drawer-actions">
-            <el-button type="success" @click="addToWhitelist(detailDevice)" :disabled="isInWhitelist(detailDevice.mac) || alertStore.accessListMode !== 'whitelist'">{{ alertStore.accessListMode === 'whitelist' ? '加入白名单' : '白名单未启用' }}</el-button>
-            <el-button type="danger" @click="addToBlacklist(detailDevice)" :disabled="isInBlacklist(detailDevice.mac) || alertStore.accessListMode !== 'blacklist'">{{ alertStore.accessListMode === 'blacklist' ? '加入黑名单' : '黑名单未启用' }}</el-button>
+            <el-button type="success" @click="addToWhitelist(detailDevice)" :disabled="isInWhitelist(detailDevice.mac) || !alertStore.accessMode.whitelist">{{ alertStore.accessMode.whitelist ? '加入白名单' : '白名单未启用' }}</el-button>
+            <el-button type="danger" @click="addToBlacklist(detailDevice)" :disabled="isInBlacklist(detailDevice.mac) || !alertStore.accessMode.blacklist">{{ alertStore.accessMode.blacklist ? '加入黑名单' : '黑名单未启用' }}</el-button>
           </div>
         </div>
       </template>
@@ -217,14 +217,20 @@ const aiDeviceResult = ref('')
 const aiIdentifying = ref(false)
 
 const accessModeText = computed(() => {
-  if (alertStore.accessListMode === 'whitelist') return '白名单模式'
-  if (alertStore.accessListMode === 'blacklist') return '黑名单模式'
+  const wl = alertStore.accessMode.whitelist
+  const bl = alertStore.accessMode.blacklist
+  if (wl && bl) return '白名单+黑名单'
+  if (wl) return '白名单模式'
+  if (bl) return '黑名单模式'
   return '未启用'
 })
 
 const accessModeTagType = computed(() => {
-  if (alertStore.accessListMode === 'whitelist') return 'success'
-  if (alertStore.accessListMode === 'blacklist') return 'danger'
+  const wl = alertStore.accessMode.whitelist
+  const bl = alertStore.accessMode.blacklist
+  if (wl && bl) return 'warning'
+  if (wl) return 'success'
+  if (bl) return 'danger'
   return 'info'
 })
 
@@ -336,8 +342,8 @@ function calcDuration(dev) {
     return Math.floor(mins/1440) + '天'
   } catch { return '-' }
 }
-function isInWhitelist(mac) { return alertStore.whitelist.some(d => d.mac === mac) }
-function isInBlacklist(mac) { return alertStore.blacklist.some(d => d.mac === mac) }
+function isInWhitelist(mac) { return alertStore.whitelist.some(d => d.mac.toLowerCase() === mac.toLowerCase()) }
+function isInBlacklist(mac) { return alertStore.blacklist.some(d => d.mac.toLowerCase() === mac.toLowerCase()) }
 
 function isNewDevice(dev) {
   if (!dev.firstSeen) return false

@@ -298,12 +298,32 @@ class DetectionEngine:
                 detector.set_target_bssids(self._target_bssids)
 
     def _extract_devices_from_frames(self, frames):
+        """Extract devices from captured frames.
+
+        In gateway mode (when we own the AP), only record devices that are
+        actually associated with our AP (confirmed by hostapd), plus our AP
+        itself. Random nearby devices sending probe requests are excluded.
+        """
+        # Get the set of actually associated stations from hostapd
+        associated_macs = set()
+        try:
+            from services.hostapd_service import get_connected_stations
+            for sta in get_connected_stations():
+                associated_macs.add(sta["mac"].lower())
+        except Exception:
+            pass
+
+        # In gateway mode, the valid device set is: our AP + associated clients
+        valid_macs = set()
+        if self._target_bssids:
+            valid_macs = self._target_bssids | associated_macs
+
         seen = {}
         now = now_str()
         for f in frames:
-            mac = f.get("sa", "")
-            bssid = f.get("bssid", "")
-            da = f.get("da", "")
+            mac = f.get("sa", "").lower()
+            bssid = f.get("bssid", "").lower()
+            da = f.get("da", "").lower()
             ssid = f.get("ssid", "")
             signal = f.get("signal")
             frame_ip = f.get("ip", "")
@@ -311,10 +331,12 @@ class DetectionEngine:
             gc = f.get("groupCipher", "")
             akm = f.get("akm", "")
 
-            candidate_addrs = [mac]
-            if da and not da.startswith("ff:") and ":" in da:
-                candidate_addrs.append(da)
-            if bssid and f["frameType"] in (FC_BEACON, FC_PROBE_RESP):
+            # In gateway mode: only process frames from valid devices
+            if valid_macs and mac and mac not in valid_macs:
+                continue
+
+            candidate_addrs = [mac] if mac else []
+            if bssid and f["frameType"] in (FC_BEACON, FC_PROBE_RESP) and bssid in valid_macs:
                 candidate_addrs.append(bssid)
 
             for addr in candidate_addrs:
@@ -356,6 +378,25 @@ class DetectionEngine:
                     entry["groupCipher"] = gc
                 if akm and not entry["akm"]:
                     entry["akm"] = akm
+        # Supplement: ensure all hostapd-associated stations appear as devices
+        # even if monitor didn't capture their frames (e.g. idle clients)
+        for sta_mac in associated_macs:
+            if sta_mac not in seen and sta_mac not in self._target_bssids:
+                seen[sta_mac] = {
+                    "mac": sta_mac,
+                    "ip": "",
+                    "ssid": _TARGET_SSID or "",
+                    "signal": -50,
+                    "status": "正常",
+                    "vendor": lookup_vendor(sta_mac),
+                    "pairwiseCipher": "",
+                    "groupCipher": "",
+                    "akm": "",
+                    "bssid": next(iter(self._target_bssids), ""),
+                    "first_seen": now,
+                    "last_seen": now,
+                }
+
         devices = list(seen.values())
         if devices:
             bulk_upsert(devices)
